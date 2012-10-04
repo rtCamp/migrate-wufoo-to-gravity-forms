@@ -68,8 +68,9 @@ function map_admin_page() {
                 $form_data = RGFormsModel::get_form_meta($form_id);
                 if(isset($_FILES['map_upload']) && $_FILES['map_upload']['error'] == 0) {
                     if($_FILES['map_upload']['type'] != 'text/csv'){
-                        echo "<div class='error'></div>";
+                        echo "<div class='error'>Please upload a CSV file only!</div>";
                     }
+                    
                     //Upload the file to 'Uploads' folder
                     $file = $_FILES['map_upload'];
                     $upload = wp_handle_upload($file, array('test_form' => false));
@@ -120,13 +121,15 @@ function map_admin_page() {
                                 <th scope="row">Column Name</th>
                                 <th scope="row">Field Name</th>
                             </tr>
-                    <?php foreach($form_data['fields'] as &$field){ ?>
+                    <?php foreach($form_data['fields'] as &$field){
+                            if($field['type'] != 'section' && $field['type'] != 'html'){
+                            ?>
                             <tr>
                                 <td><?php echo ucfirst($field['label']); ?></td>
                                 <td>
                                     <?php 
                                         $form_fields = '<select name="field-'.$field['id'].'" class="map_form_fields">';
-                                        $form_fields .= '<option value="">Choose a field</option>';
+                                        $form_fields .= '<option value="">Choose a field or Skip it</option>';
                                         foreach($csv->titles as $value) {
                                             $form_fields .= '<option value="'.$value.'">'.ucfirst($value).'</option>';
                                         }
@@ -136,7 +139,8 @@ function map_admin_page() {
                                     ?>
                                 </td>
                             </tr>
-                    <?php } ?>
+                    <?php }
+                        } ?>
                     <?php
                         $form_extra_fields = '<option value="">Choose a field</option>';
                         foreach($csv->titles as $value) {
@@ -337,21 +341,38 @@ function map_import_callback(){
                 if(isset($val) && $val != ''){
                     if($field['type'] == 'fileupload'){
                         if(array_key_exists($val, $csv->data[$row_index])){
-                            $image_data = wp_remote_get($csv->data[$row_index][$val]);
-                            $upload = wp_upload_bits(basename($csv->data[$row_index][$val]), 0, $image_data['body']);
-                            $op[$field_id[1]] = $upload['url'];
+                            if(isset($csv->data[$row_index][$val]) && $csv->data[$row_index][$val] != ''){
+                                $image_data = wp_remote_get($csv->data[$row_index][$val]);
+                                if(!is_wp_error($image_data) && $image_data['body'] != ''){
+                                    $upload = wp_upload_bits(basename($csv->data[$row_index][$val]), 0, $image_data['body']);
+                                    $op[$field_id[1]] = $upload['url'];
+                                } else {
+                                    $op[$field_id[1]] = 'Image not found';
+                                }
+                            } else {
+                                $op[$field_id[1]] = 'No image set';
+                            }
                         } else {
                             $image_data = wp_remote_get($val);
-                            $upload = wp_upload_bits(basename($val), 0, $image_data['body']);
-                            $op[$field_id[1]] = $upload['url'];
+                            if(!is_wp_error($image_data) && $image_data['body'] != ''){
+                                $upload = wp_upload_bits(basename($val), 0, $image_data['body']);
+                                $op[$field_id[1]] = $upload['url'];
+                            } else {
+                                $op[$field_id[1]] = 'Image not found';
+                            }
                         }
                     } else {
                         if(array_key_exists($val, $csv->data[$row_index])){
-                            $op[$field_id[1]] = $csv->data[$row_index][$single['value']];
+                            if(isset($csv->data[$row_index][$single['value']]) && $csv->data[$row_index][$single['value']] != '')
+                                $op[$field_id[1]] = $csv->data[$row_index][$single['value']];
+                            else
+                                $op[$field_id[1]] = '';
                         } else {
                             $op[$field_id[1]] = $val;
                         }
                     }
+                } else {
+                    $op[$field_id[1]] = '';
                 }
             }
         }
@@ -365,11 +386,11 @@ function map_import_callback(){
         
         //Format date according to Datetime format
         if($date_format == 'mdy'){
-            echo $date_created = date('Y-m-d H:i:s', $date_created);
+            $date_created = date('Y-m-d H:i:s', $date_created);
         } else if($date_format == 'dmy'){
             $timezone = "Asia/Calcutta";
             date_default_timezone_set($timezone);
-            echo $date_created = date('Y-m-d H:i:s', $date_created);
+            $date_created = date('Y-m-d H:i:s', $date_created);
         }
         
         $wpdb->query($wpdb->prepare("INSERT INTO $lead_table(form_id, ip, source_url, date_created, user_agent, currency, created_by) VALUES(%d, %s, %s, %s, %s, %s, {$user_id})", $form_id, $ip, $page, $date_created, $user_agent, $currency));
@@ -475,8 +496,8 @@ function map_wuf_form_fields_callback(){
         
         $gform_data = RGFormsModel::get_form_meta($gform);
         $fields = $wuf->getFields($wuf_form);
-        //$entries = $wuf->getEntries($wuf_form, 'forms', 'pageStart=0&pageSize=100');
-        
+        //$entries = $wuf->getEntries($wuf_form, 'forms', 'pageStart=0&pageSize=20');
+       
         $return = '<h3>Map Fields:</h3>';
         $return .='<form action="" method="post" id="map_wuf_field_mapping_form">';
         $return .= '<table class="wp-list-table widefat fixed" id="map_wuf_field_mapping_table">';
@@ -487,9 +508,9 @@ function map_wuf_form_fields_callback(){
                 $return .= '<td>'.ucfirst($gfield['label']).'</td>';
                 $return .= '<td>';
                     $return .= '<select name="field-'.$gfield['id'].'" class="map_wuf_gform_fields">';
-                    $return .= '<option value="">Choose a field</option>';
+                    $return .= '<option value="">Choose a field or Skip it</option>';
                     foreach($fields->Fields as $field => $field_data){
-                        if(strpos($field, 'Field') !== FALSE){
+                        if(strpos($field, 'Field') !== FALSE || strpos($field, 'Entry') !== FALSE){
                             $return .= '<option value="'.$field.'">'.$field_data->Title.'</option>';
                         }
                     }
@@ -552,27 +573,51 @@ function map_wuf_form_field_mapping_callback(){
         $gform_meta = RGFormsModel::get_form_meta($gform);
         
         foreach($values as $key => $val){
+            $field = explode('-', $key);
+            $field = $field[1];
             if(isset($val) && $val != ''){
-                $field = explode('-', $key);
-                $field = $field[1];
                 $field_meta = RGFormsModel::get_field($gform_meta, $field);
                 if($field_meta['type'] == 'fileupload'){
-                    $image_url = $wuf_entries[$wuf_entry_index]->$val;
-                    if(isset($image_url) && $image_url != ''){
-                        $image_url = explode('(', $image_url);
-                        $image_url = explode(')', $image_url[1]);
-                        $image_data = wp_remote_get($image_url[0]);
-                        $upload = wp_upload_bits(basename($image_url[0]), 0, $image_data['body']);
-                        $op[$field] = $upload['url'];
+                    //If field exists in the entries, use it else use the value directly
+                    if(property_exists($wuf_entries[$wuf_entry_index], $val)){
+                        $image_url = $wuf_entries[$wuf_entry_index]->$val;
+                        if(isset($image_url) && $image_url != ''){
+                            $image_url = explode('(', $image_url);
+                            $image_url = explode(')', $image_url[1]);
+                            echo $image_url[0];
+                            $image_data = wp_remote_get($image_url[0]);
+                            if(!is_wp_error($image_data) && $image_data['body'] != ''){
+                                $upload = wp_upload_bits(basename($image_url[0]), 0, $image_data['body']);
+                                $op[$field] = $upload['url'];
+                            } else {
+                                $op[$field] = 'Image not found';
+                            }
+                        } else {
+                            $op[$field] = 'No image set';
+                        }
                     } else {
-                        $op[$field] = 'No image set';
+                        $image_url = $val;
+                        if(isset($image_url) && $image_url != ''){
+                            $image_data = wp_remote_get($image_url[0]);
+                            $upload = wp_upload_bits(basename($image_url[0]), 0, $image_data['body']);
+                            $op[$field] = $upload['url'];
+                        } else {
+                            $op[$field] = 'No image set';
+                        }
                     }
                 } else {
-                    $op[$field] = $wuf_entries[$wuf_entry_index]->$val;
+                    if(property_exists($wuf_entries[$wuf_entry_index], $val)){
+                        $op[$field] = $wuf_entries[$wuf_entry_index]->$val;
+                    } else {
+                        $op[$field] = $val;
+                    }
                 }
+            } else {
+                $op[$field] = '';
             }
         }
         
+        //Set user for the entry
         if(array_key_exists($wuf_entries[$wuf_entry_index]->CreatedBy, $wuf_user_mapping)){
             $user = $wuf_user_mapping[$wuf_entries[$wuf_entry_index]->CreatedBy];
             $user = get_user_by('id', $user);
@@ -585,8 +630,7 @@ function map_wuf_form_field_mapping_callback(){
             $user_id = 1;
         }
         
-        $user = get_user_by('login', $wuf_entries[$wuf_entry_index]->CreatedBy);
-        $user = !is_wp_error();
+        //Set the default params for a lead entry
         $date = isset($wuf_entries[$wuf_entry_index]->DateCreated) && $wuf_entries[$wuf_entry_index]->DateCreated != '' ? $wuf_entries[$wuf_entry_index]->DateCreated : date('Y-m-d H:i:s');
         $user_id = $current_user && $current_user->ID ? $current_user->ID : 'NULL';
         $lead_table = $f->get_lead_table_name();
@@ -594,6 +638,8 @@ function map_wuf_form_field_mapping_callback(){
         $currency = $c->get_currency();
         $ip = $f->get_ip();
         $page = $f->get_current_page_url();
+        
+        //Insert a new entry/lead
         $wpdb->query($wpdb->prepare("INSERT INTO $lead_table(form_id, ip, source_url, date_created, user_agent, currency, created_by) VALUES(%d, %s, %s, %s, %s, %s, {$user_id})", $gform, $ip, $page, $date, $user_agent, $currency));
         $lead_id = $wpdb->insert_id;
         if(!$lead_id) {
@@ -601,7 +647,14 @@ function map_wuf_form_field_mapping_callback(){
         } else {
             foreach($op as $inputid => $value){
                 $wpdb->insert($prefix.'rg_lead_detail', array('lead_id' => $lead_id, 'form_id' => $gform, 'field_number' => $inputid, 'value' => $value), array('%d', '%d', '%d', '%s'));
+                $lead_detail_id = $wpdb->insert_id;
+                //If the value is more than 200 chars, insert it into lead detail long table
+                if(strlen($value) > 200){
+                    map_insert_lead_detail_long($lead_detail_id, $value);
+                }
             }
+            
+            //Insert comments as notes for the corresponding user map
             foreach($wuf_comments as $wuf_comment){
                 if(array_key_exists($wuf_comment->CommentedBy, $wuf_user_mapping)){
                     $table_name = $f->get_lead_notes_table_name();
@@ -626,4 +679,25 @@ function map_get_comments_by_entry($api_key, $subdomain, $formhash, $entry_id){
         }
     }
     return $return;
+}
+
+function map_insert_lead_detail_long($lead_detail_id, $value){
+    global $wpdb;
+    $f = new RGFormsModel();
+    $lead_detail_long = $f->get_lead_details_long_table_name();
+    $query = $wpdb->prepare("INSERT INTO $lead_detail_long(lead_detail_id, value) VALUES(%d, %s)", $lead_detail_id, $value);
+    $wpdb->query($query);
+}
+
+//Length of the entry in GF entries
+//apply_filters("gform_entry_field_value", $display_value, $field, $lead, $form);
+//add_filter("gform_entry_field_value", 'map_entry_length', '', 4);
+function map_entry_length($display_value, $field, $lead, $form){
+    echo '<pre>';
+    print_r($display_value);
+    print_r($field);
+    print_r($lead);
+    //print_r($form);
+    echo '</pre>';
+    return $display_value;
 }

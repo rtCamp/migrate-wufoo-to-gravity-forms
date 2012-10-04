@@ -41,6 +41,17 @@ jQuery(document).ready(function(){
         }
     });
     
+    jQuery('.map_wuf_gform_fields').live('change', function(){
+        if(jQuery(this).val() == 'other') {
+            jQuery(this).parent().append('<input type="text" name="'+jQuery(this).attr('name')+'"/>');
+            jQuery(this).removeAttr('name')
+        } else {
+            var attr = jQuery(this).parent().children('input').attr('name');
+            jQuery(this).attr('name', attr);
+            jQuery(this).parent().children('input').remove();
+        }
+    });
+    
     //Disable same option
 //    jQuery('.map_form_fields').change(function(){
 //        var val = jQuery(this).val();
@@ -92,13 +103,13 @@ jQuery(document).ready(function(){
     
     jQuery('#map_wuf_field_mapping_form').live('submit', function(){
         var obj = jQuery(this);
-        obj.find('.error').remove();
+        //obj.find('.error').remove();
         var flag = 0;
-        jQuery('.map_wuf_gform_fields').each(function(){
-            if(jQuery(this).val() == ''){
-                flag = 1;
-            }
-        });
+//        jQuery('.map_wuf_gform_fields').each(function(){
+//            if(jQuery(this).val() == ''){
+//                flag = 1;
+//            }
+//        });
         
         if(flag == 1){
             obj.prepend('<div class="error">Please match non-blank fields!</div>');
