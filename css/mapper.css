@@ -1,0 +1,16 @@
+#map_mapping_table{ margin: 25px 0; }
+.map_message{ padding: 10px !important; text-align: center; }
+#map_mapping_progress{ margin-top: 20px; }
+.map_mapping_success{ color: #8BD864; }
+.map_mapping_failure{ color: #D86464; }
+#map_mapping_import,
+#map_wuf_import_comments,
+#map_wuf_get_fields,
+#map_wuf_field_mapping_submit{ float: left; }
+.map_loading{ background: url("../images/loading.gif") no-repeat 0 0 transparent; display: none; float: left; height: 20px; margin-left: 5px; margin-top: 5px; width: 20px;}
+#map_date_format_selector{ display: inline; padding: 0 10px; }
+#map_date_format_selector input{ margin-right: 5px; }
+
+#map_wuf_field_mapping_form{ margin: 20px 0; }
+#map_wuf_field_mapping_table{ margin-bottom: 20px; }
+#map_wuf_field_mapping_form select{ width: 65%; }
