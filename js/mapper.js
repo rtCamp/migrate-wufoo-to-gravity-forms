@@ -25,7 +25,7 @@ jQuery(document).ready(function(){
         }
         return false;
     });
-    
+
 //    jQuery(".map_loading").ajaxStart(function(){
 //        jQuery(this).show();
 //    });
@@ -122,6 +122,7 @@ jQuery(document).ready(function(){
                 user_map[jQuery(this).attr('name')] = jQuery(this).val();
             });
             
+            var current = 0;
             var count = jQuery('#map_wuf_entry_count').val();
             for(var i = 0; i < parseInt(count); i++){
                 var ajaxdata = {
@@ -134,17 +135,37 @@ jQuery(document).ready(function(){
                     map_wuf_user_mapping: user_map,
                     map_wuf_entry_index: i
                 };
+                
+//                For Asynchronous requests, not working
+//                jQuery.ajax({
+//                    action: 'map_wuf_form_field_mapping',
+//                    type: "POST",
+//                    url: ajaxurl,
+//                    data: ajaxdata,
+//                    async: false
+//                }).done(function(response){
+//                    current = current+1;
+//                    if(response != 0){
+//                        obj.find('.map_loading').hide();
+//                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_success">Row '+response+' inserted. '+current+'/'+count+'</td></tr>');
+//                    } else {
+//                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_failure">Row '+response+' failed. '+current+'/'+count+'</td></tr>');
+//                    }
+//                });
+                    
 
+                jQuery.ajaxSetup({type: 'POST', async: false});
                 jQuery.post(ajaxurl, ajaxdata, function(response){
+                    current = current + 1;
                     if(response != 0){
                         obj.find('.map_loading').hide();
-                        jQuery('#map_mapping_progress').append('<tr><td><div class="map_mapping_success">Row '+response+' inserted.</td></tr>');
+                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_success">Row '+response+' inserted. '+current+'/'+count+'</td></tr>');
                     } else {
-                        jQuery('#map_mapping_progress').append('<tr><td><div class="map_mapping_failure">Row '+response+' failed.</td></tr>');
+                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_failure">Row '+response+' failed. '+current+'/'+count+'</td></tr>');
                     }
                 });
             }
-        }        
+        }
         return false;
     });
 });

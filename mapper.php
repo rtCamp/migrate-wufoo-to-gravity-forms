@@ -248,7 +248,8 @@ function map_wufoo_admin_page(){
             <input type="hidden" name="map_wuf_key" value="<?php echo $wuf_api_key; ?>" />
         </form>
         <?php } ?>
-        <table id="map_mapping_progress" class="widefat"></table>
+        <table id="map_mapping_progress" class="widefat">
+        </table>
     </div>
 <?php }
 
@@ -425,13 +426,14 @@ function map_wuf_form_select_callback(){
         $wuf_form = $values['map_wuf_forms_list'];
         $wuf_form_comments = $wuf->getComments($wuf_form);
         $wuf_entry_count = $wuf->getEntryCount($wuf_form);
- 
-//        $wuf_page_size = 100;
-//        $wuf_times = ceil(floatval($wuf_entry_count) / 100);
-//        $wuf_form_entries = array();
-//        for($i = 0; $i < $wuf_times; $i++){
-//            $wuf_form_entries = array_merge($wuf_form_entries,$wuf->getEntries($wuf_form, 'forms', 'pageStart='.($i*$wuf_page_size).'&pageSize='.$wuf_page_size));
-//        }
+        $wuf_form_fields = $wuf->getFields($wuf_form);
+
+        $wuf_page_size = 50;
+        $wuf_times = ceil(floatval($wuf_entry_count) / 50);
+        $wuf_form_entries = array();
+        for($i = 0; $i < $wuf_times; $i++){
+            $wuf_form_entries = array_merge($wuf_form_entries,$wuf->getEntries($wuf_form, 'forms', 'pageStart='.($i*$wuf_page_size).'&pageSize='.$wuf_page_size));
+        }
         
         if(isset($wuf_form_comments) && !empty($wuf_form_comments)){
             foreach($wuf_form_comments as $wuf_form_comment){
@@ -450,8 +452,9 @@ function map_wuf_form_select_callback(){
             $form_select = '<strong>Please create some forms!</strong>';
         }
         
-        //Use this to get the comments
-        //update_option($wuf_form.'_comments', maybe_serialize($wuf_commentators));
+        //Use this to get the entries and fields
+        update_option($wuf_form.'_entries', maybe_serialize($wuf_form_entries));
+        update_option($wuf_form.'_fields', maybe_serialize($wuf_form_fields));
         
         //Return the markup
         $return = '<form action="" method="post" id="map_wuf_comment_mapping_form">';
@@ -474,7 +477,7 @@ function map_wuf_form_select_callback(){
                 <span class="map_loading"></span></td></tr>';
         $return .= '</table>';
         $return .= '<input type="hidden" name="map_wuf_form_hash" value="'.$wuf_form.'" id="map_wuf_form_hash"/>';
-        $return .= '<input type="hidden" name="map_wuf_entry_count" id="map_wuf_entry_count" value="'.$wuf_entry_count.'">';
+        $return .= '<input type="hidden" name="map_wuf_entry_count" id="map_wuf_entry_count" value="'.$wuf_times.'"/>';
         $return .= '</form>';
         
         echo $return;
@@ -552,155 +555,148 @@ function map_wuf_form_field_mapping_callback(){
         $wuf_form = $_POST['map_wuf_form_hash'];
         $wuf_key = $_POST['map_wuf_key'];
         $wuf_sub = $_POST['map_wuf_sub'];
-        
-        $wuf = new WufooApiWrapper($wuf_key, $wuf_sub);
-        
-        $wuf_entry_count = $wuf->getEntryCount($wuf_form);
-        $wuf_page_size = 100;
-        $wuf_times = ceil(floatval($wuf_entry_count) / 100);
-        $wuf_entries = array();
-        
-        for($i = 0; $i < $wuf_times; $i++){
-            $wuf_entries = array_merge($wuf_entries,$wuf->getEntries($wuf_form, 'forms', 'pageStart='.($i*$wuf_page_size).'&pageSize='.$wuf_page_size));
-        }
-        
-        //$wuf_entries = $wuf->getEntries($_POST['map_wuf_form_hash'], 'forms', 'pageStart=0&pageSize=100');
-        //$wuf_commentators = get_option($_POST['map_wuf_form_hash'].'_comments');
         $wuf_user_mapping = $_POST['map_wuf_user_mapping'];
         $wuf_entry_index = $_POST['map_wuf_entry_index'];
-        $wuf_comments = map_get_comments_by_entry($wuf_key, $wuf_sub, $wuf_form, $wuf_entries[$wuf_entry_index]->EntryId);
-        $wuf_fields = $wuf->getFields($wuf_form);
+        
+        $wuf_fields = maybe_unserialize(get_option($wuf_form.'_fields'));
+        $wuf_entries = maybe_unserialize(get_option($wuf_form.'_entries'));
+        $wuf_entries_chunked = array_chunk($wuf_entries, 50);
         
         //Create GForm entry
         $f = new RGFormsModel();
         $c = new GFCommon();
-        global $wpdb;
-        $prefix = $wpdb->prefix;
         $gform_meta = RGFormsModel::get_form_meta($gform);
         
-        foreach($values as $key => $val){
-            $field = explode('-', $key);
-            $field = $field[1];
-            if(isset($val) && $val != ''){
-                $field_meta = RGFormsModel::get_field($gform_meta, $field);
-                if($field_meta['type'] == 'fileupload'){
-                    //If field exists in the entries, use it else use the value directly
-                    if(property_exists($wuf_entries[$wuf_entry_index], $val)){
-                        $image_url = $wuf_entries[$wuf_entry_index]->$val;
-                        if(isset($image_url) && $image_url != ''){
-                            $image_url = explode('(', $image_url);
-                            $image_url = explode(')', $image_url[1]);
-                            $image_data = wp_remote_get($image_url[0]);
-                            if(!is_wp_error($image_data) && $image_data['body'] != ''){
+        global $wpdb;
+        $prefix = $wpdb->prefix;
+        
+        foreach($wuf_entries_chunked[$wuf_entry_index] as $index => $wuf_entry){
+            $wuf_comments = map_get_comments_by_entry($wuf_key, $wuf_sub, $wuf_form, $wuf_entry->EntryId);
+            foreach($values as $key => $val){
+                $field = explode('-', $key);
+                $field = $field[1];
+                if(isset($val) && $val != ''){
+                    $field_meta = RGFormsModel::get_field($gform_meta, $field);
+                    if($field_meta['type'] == 'fileupload'){
+                        //If field exists in the entries, use it else use the value directly
+                        if(property_exists($wuf_entry, $val)){
+                            $image_url = $wuf_entry->$val;
+                            if(isset($image_url) && $image_url != ''){
+                                $image_url = explode('(', $image_url);
+                                $image_url = explode(')', $image_url[1]);
+                                $image_data = wp_remote_get($image_url[0]);
+                                if(!is_wp_error($image_data) && $image_data['body'] != ''){
+                                    $upload = wp_upload_bits(basename($image_url[0]), 0, $image_data['body']);
+                                    $op[$field] = $upload['url'];
+                                } else {
+                                    $op[$field] = 'Image not found';
+                                }
+                            } else {
+                                $op[$field] = 'No image set';
+                            }
+                        } else {
+                            $image_url = $val;
+                            if(isset($image_url) && $image_url != ''){
+                                $image_data = wp_remote_get($image_url[0]);
                                 $upload = wp_upload_bits(basename($image_url[0]), 0, $image_data['body']);
                                 $op[$field] = $upload['url'];
                             } else {
-                                $op[$field] = 'Image not found';
+                                $op[$field] = 'No image set';
                             }
-                        } else {
-                            $op[$field] = 'No image set';
                         }
                     } else {
-                        $image_url = $val;
-                        if(isset($image_url) && $image_url != ''){
-                            $image_data = wp_remote_get($image_url[0]);
-                            $upload = wp_upload_bits(basename($image_url[0]), 0, $image_data['body']);
-                            $op[$field] = $upload['url'];
+                        if(property_exists($wuf_entry, $val)){
+                            if(property_exists($wuf_fields->Fields[$val], 'SubFields') && is_array($wuf_fields->Fields[$val]->SubFields)){
+                                if(is_array($field_meta['inputs'])){
+                                    $wuf_field_keys = array_keys($wuf_fields->Fields[$val]->SubFields);
+                                    if(count($wuf_field_keys) == count($field_meta['inputs'])){
+                                        foreach($wuf_field_keys as $i => $wuf_field_key){
+                                            $op[strval($field_meta['inputs'][$i]['id'])] = $wuf_entry->$wuf_field_key;
+                                        }
+                                    } else if(count($wuf_field_keys) > count($field_meta['inputs'])) {
+                                        $wuf_last = array_pop($wuf_field_keys);
+                                        $gfield_last = array_pop($field_meta['inputs']);
+                                        $op[strval($gfield_last['id'])] = $wuf_entry->$wuf_last;
+                                        $wuf_value = '';
+                                        foreach($wuf_fields->Fields[$val]->SubFields as $key => $value){
+                                            $wuf_value .= $wuf_entry->$key;
+                                            $wuf_value .= ' ';
+                                        }
+                                        $op[$field_meta['inputs']][0] = $wuf_value;
+                                    }
+                                } else {
+                                    $wuf_value = '';
+                                    foreach($wuf_fields->Fields[$val]->SubFields as $key => $value){
+                                        $wuf_value .= $wuf_entry->$key;
+                                        $wuf_value .= ' ';
+                                    }
+                                    $op[$field] = $wuf_value;
+                                }
+                            } else {
+                                $op[$field] = $wuf_entry->$val;
+                            }
                         } else {
-                            $op[$field] = 'No image set';
+                            $op[$field] = $val;
                         }
                     }
                 } else {
-                    if(property_exists($wuf_entries[$wuf_entry_index], $val)){
-                        if(property_exists($wuf_fields->Fields[$val], 'SubFields') && is_array($wuf_fields->Fields[$val]->SubFields)){
-                            if(is_array($field_meta['inputs'])){
-                                $wuf_field_keys = array_keys($wuf_fields->Fields[$val]->SubFields);
-                                if(count($wuf_field_keys) == count($field_meta['inputs'])){
-                                    foreach($wuf_field_keys as $i => $wuf_field_key){
-                                        $op[strval($field_meta['inputs'][$i]['id'])] = $wuf_entries[$wuf_entry_index]->$wuf_field_key;
-                                    }
-                                } else if(count($wuf_field_keys) > count($field_meta['inputs'])) {
-                                    $wuf_last = array_pop($wuf_field_keys);
-                                    $gfield_last = array_pop($field_meta['inputs']);
-                                    $op[strval($gfield_last['id'])] = $wuf_entries[$wuf_entry_index]->$wuf_last;
-                                    $wuf_value = '';
-                                    foreach($wuf_fields->Fields[$val]->SubFields as $key => $value){
-                                        $wuf_value .= $wuf_entries[$wuf_entry_index]->$key;
-                                        $wuf_value .= ' ';
-                                    }
-                                    $op[$field_meta['inputs']][0] = $wuf_value;
-                                }
-                            } else {
-                                $wuf_value = '';
-                                foreach($wuf_fields->Fields[$val]->SubFields as $key => $value){
-                                    $wuf_value .= $wuf_entries[$wuf_entry_index]->$key;
-                                    $wuf_value .= ' ';
-                                }
-                                $op[$field] = $wuf_value;
-                            }
-                        } else {
-                            $op[$field] = $wuf_entries[$wuf_entry_index]->$val;
-                        }
-                    } else {
-                        $op[$field] = $val;
-                    }
+                    $op[$field] = '';
                 }
-            } else {
-                $op[$field] = '';
             }
-        }
-        
-        //Set user for the entry
-        if(isset($wuf_user_mapping) && !empty($wuf_user_mapping)){
-            if(array_key_exists($wuf_entries[$wuf_entry_index]->CreatedBy, $wuf_user_mapping)){
-                $user = $wuf_user_mapping[$wuf_entries[$wuf_entry_index]->CreatedBy];
-                $user = get_user_by('id', $user);
-                if(!is_wp_error($user)){
-                    $user_id = $user;
+
+            //Set user for the entry
+            if(isset($wuf_user_mapping) && !empty($wuf_user_mapping)){
+                if(array_key_exists($wuf_entry->CreatedBy, $wuf_user_mapping)){
+                    $user = $wuf_user_mapping[$wuf_entry->CreatedBy];
+                    $user = get_user_by('id', $user);
+                    if(!is_wp_error($user)){
+                        $user_id = $user;
+                    } else {
+                        $user_id = 1;
+                    }
                 } else {
                     $user_id = 1;
                 }
+            }
+
+            //Set the default params for a lead entry
+            $date = isset($wuf_entry->DateCreated) && $wuf_entry->DateCreated != '' ? $wuf_entry->DateCreated : date('Y-m-d H:i:s');
+            $user_id = $current_user && $current_user->ID ? $current_user->ID : 'NULL';
+            $lead_table = $f->get_lead_table_name();
+            $user_agent = strlen($_SERVER["HTTP_USER_AGENT"]) > 250 ? substr($_SERVER["HTTP_USER_AGENT"], 0, 250) : $_SERVER["HTTP_USER_AGENT"];
+            $currency = $c->get_currency();
+            $ip = $f->get_ip();
+            $page = $f->get_current_page_url();
+
+            //Insert a new entry/lead
+            $wpdb->query($wpdb->prepare("INSERT INTO $lead_table(form_id, ip, source_url, date_created, user_agent, currency, created_by) VALUES(%d, %s, %s, %s, %s, %s, {$user_id})", $gform, $ip, $page, $date, $user_agent, $currency));
+            $lead_id = $wpdb->insert_id;
+            if(!$lead_id) {
+                echo 0;
             } else {
-                $user_id = 1;
-            }
-        }
-        //Set the default params for a lead entry
-        $date = isset($wuf_entries[$wuf_entry_index]->DateCreated) && $wuf_entries[$wuf_entry_index]->DateCreated != '' ? $wuf_entries[$wuf_entry_index]->DateCreated : date('Y-m-d H:i:s');
-        $user_id = $current_user && $current_user->ID ? $current_user->ID : 'NULL';
-        $lead_table = $f->get_lead_table_name();
-        $user_agent = strlen($_SERVER["HTTP_USER_AGENT"]) > 250 ? substr($_SERVER["HTTP_USER_AGENT"], 0, 250) : $_SERVER["HTTP_USER_AGENT"];
-        $currency = $c->get_currency();
-        $ip = $f->get_ip();
-        $page = $f->get_current_page_url();
-        
-        //Insert a new entry/lead
-        $wpdb->query($wpdb->prepare("INSERT INTO $lead_table(form_id, ip, source_url, date_created, user_agent, currency, created_by) VALUES(%d, %s, %s, %s, %s, %s, {$user_id})", $gform, $ip, $page, $date, $user_agent, $currency));
-        $lead_id = $wpdb->insert_id;
-        if(!$lead_id) {
-            echo 0;
-        } else {
-            foreach($op as $inputid => $value){
-                $wpdb->insert($prefix.'rg_lead_detail', array('lead_id' => $lead_id, 'form_id' => $gform, 'field_number' => $inputid, 'value' => $value), array('%d', '%d', '%f', '%s'));
-                $lead_detail_id = $wpdb->insert_id;
-                //If the value is more than 200 chars, insert it into lead detail long table
-                if(strlen($value) > 200){
-                    map_insert_lead_detail_long($lead_detail_id, $value);
+                foreach($op as $inputid => $value){
+                    $wpdb->insert($prefix.'rg_lead_detail', array('lead_id' => $lead_id, 'form_id' => $gform, 'field_number' => $inputid, 'value' => $value), array('%d', '%d', '%f', '%s'));
+                    $lead_detail_id = $wpdb->insert_id;
+                    //If the value is more than 200 chars, insert it into lead detail long table
+                    if(strlen($value) > 200){
+                        map_insert_lead_detail_long($lead_detail_id, $value);
+                    }
                 }
-            }
-            
-            //Insert comments as notes for the corresponding user map
-            if(isset($wuf_comments) && !empty($wuf_comments)){
-                foreach($wuf_comments as $wuf_comment){
-                    if(array_key_exists($wuf_comment->CommentedBy, $wuf_user_mapping)){
-                        $table_name = $f->get_lead_notes_table_name();
-                        $user = get_user_by('id', $wuf_user_mapping[$wuf_comment->CommentedBy]);
-                        $sql = $wpdb->prepare("INSERT INTO $table_name(lead_id, user_id, user_name, value, date_created) values(%d, %d, %s, %s, %s)", $lead_id, $wuf_user_mapping[$wuf_comment->CommentedBy], $user->display_name, $wuf_comment->Text, $wuf_comment->DateCreated);
-                        $wpdb->query($sql);
+
+                //Insert comments as notes for the corresponding user map
+                if(isset($wuf_comments) && !empty($wuf_comments)){
+                    foreach($wuf_comments as $wuf_comment){
+                        if(array_key_exists($wuf_comment->CommentedBy, $wuf_user_mapping)){
+                            $table_name = $f->get_lead_notes_table_name();
+                            $user = get_user_by('id', $wuf_user_mapping[$wuf_comment->CommentedBy]);
+                            $sql = $wpdb->prepare("INSERT INTO $table_name(lead_id, user_id, user_name, value, date_created) values(%d, %d, %s, %s, %s)", $lead_id, $wuf_user_mapping[$wuf_comment->CommentedBy], $user->display_name, $wuf_comment->Text, $wuf_comment->DateCreated);
+                            $wpdb->query($sql);
+                        }
                     }
                 }
             }
-            echo $wuf_entry_index;
-        }
+        }   //Chunk loop end
+        echo $wuf_entry_index;
     }
     die();
 }
