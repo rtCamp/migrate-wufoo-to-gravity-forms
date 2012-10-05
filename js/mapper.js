@@ -73,6 +73,7 @@ jQuery(document).ready(function(){
                 map_wuf_form_data: form_data
             };
             jQuery.post(ajaxurl, ajaxdata, function(response){
+                obj.find('.map_loading').hide();
                 obj.after(response);
             });
         }
@@ -117,13 +118,12 @@ jQuery(document).ready(function(){
             obj.find('.map_loading').show();
             var form_data = obj.serializeArray();
             var user_map = {};
-
             jQuery('#map_wuf_comment_mapping_table select').each(function(){
                 user_map[jQuery(this).attr('name')] = jQuery(this).val();
             });
             
             var count = jQuery('#map_wuf_entry_count').val();
-            for(var i = 2; i < parseInt(count)+1; i++){
+            for(var i = 0; i < parseInt(count); i++){
                 var ajaxdata = {
                     action: 'map_wuf_form_field_mapping',
                     map_gform: jQuery('#map_wuf_gforms_list').val(),
@@ -136,21 +136,15 @@ jQuery(document).ready(function(){
                 };
 
                 jQuery.post(ajaxurl, ajaxdata, function(response){
-                    obj.find('.map_loading').hide();
                     if(response != 0){
+                        obj.find('.map_loading').hide();
                         jQuery('#map_mapping_progress').append('<tr><td><div class="map_mapping_success">Row '+response+' inserted.</td></tr>');
                     } else {
                         jQuery('#map_mapping_progress').append('<tr><td><div class="map_mapping_failure">Row '+response+' failed.</td></tr>');
                     }
                 });
             }
-        }
+        }        
         return false;
     });
-    
-    jQuery(".map_loading").ajaxStop(function(){
-        jQuery(this).hide();
-    });
 });
-
-

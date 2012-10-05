@@ -13,4 +13,5 @@
 
 #map_wuf_field_mapping_form{ margin: 20px 0; }
 #map_wuf_field_mapping_table{ margin-bottom: 20px; }
-#map_wuf_field_mapping_form select{ width: 65%; }
+#map_wuf_field_mapping_form select,
+#map_mapping_form select { width: 65%; }
