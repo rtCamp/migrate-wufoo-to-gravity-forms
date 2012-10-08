@@ -546,21 +546,24 @@ function map_wuf_form_fields_callback(){
 add_action('wp_ajax_map_wuf_form_field_mapping', 'map_wuf_form_field_mapping_callback');
 function map_wuf_form_field_mapping_callback(){
     if(isset($_POST['action']) && $_POST['action'] == 'map_wuf_form_field_mapping'){
+        
+        //The actual mapping: Gfield ID = Wufoo field ID
         $data = $_POST['map_wuf_form_data'];
         foreach($data as $single){
             $values[$single['name']] = $single['value'];
         }
         
-        $gform = $_POST['map_gform'];
-        $wuf_form = $_POST['map_wuf_form_hash'];
-        $wuf_key = $_POST['map_wuf_key'];
-        $wuf_sub = $_POST['map_wuf_sub'];
-        $wuf_user_mapping = $_POST['map_wuf_user_mapping'];
-        $wuf_entry_index = $_POST['map_wuf_entry_index'];
+        //Other required details
+        $gform = $_POST['map_gform'];   //GForm ID
+        $wuf_form = $_POST['map_wuf_form_hash']; //Wufoo form hash
+        $wuf_key = $_POST['map_wuf_key']; //Wufoo API key
+        $wuf_sub = $_POST['map_wuf_sub']; //Wufoo Subdomain
+        $wuf_user_mapping = $_POST['map_wuf_user_mapping']; //Wufoo comment to WP user id map
+        $wuf_entry_index = $_POST['map_wuf_entry_index']; //Wufoo entry chunk index
         
-        $wuf_fields = maybe_unserialize(get_option($wuf_form.'_fields'));
-        $wuf_entries = maybe_unserialize(get_option($wuf_form.'_entries'));
-        $wuf_entries_chunked = array_chunk($wuf_entries, 50);
+        $wuf_fields = maybe_unserialize(get_option($wuf_form.'_fields')); //Wufoo fields saved in options with form hash
+        $wuf_entries = maybe_unserialize(get_option($wuf_form.'_entries')); //Wufoo entries saved in options with form hash
+        $wuf_entries_chunked = array_chunk($wuf_entries, 50); //Wufoo entries chunked in batches of n (50 here, change it above too)
         
         //Create GForm entry
         $f = new RGFormsModel();
@@ -570,7 +573,9 @@ function map_wuf_form_field_mapping_callback(){
         global $wpdb;
         $prefix = $wpdb->prefix;
         
+        echo 'This chunk: '.count($wuf_entries_chunked[$wuf_entry_index]);
         foreach($wuf_entries_chunked[$wuf_entry_index] as $index => $wuf_entry){
+            //Get Wufoo comments for a particular entry
             $wuf_comments = map_get_comments_by_entry($wuf_key, $wuf_sub, $wuf_form, $wuf_entry->EntryId);
             foreach($values as $key => $val){
                 $field = explode('-', $key);
@@ -671,9 +676,7 @@ function map_wuf_form_field_mapping_callback(){
             //Insert a new entry/lead
             $wpdb->query($wpdb->prepare("INSERT INTO $lead_table(form_id, ip, source_url, date_created, user_agent, currency, created_by) VALUES(%d, %s, %s, %s, %s, %s, {$user_id})", $gform, $ip, $page, $date, $user_agent, $currency));
             $lead_id = $wpdb->insert_id;
-            if(!$lead_id) {
-                echo 0;
-            } else {
+            if($lead_id) {
                 foreach($op as $inputid => $value){
                     $wpdb->insert($prefix.'rg_lead_detail', array('lead_id' => $lead_id, 'form_id' => $gform, 'field_number' => $inputid, 'value' => $value), array('%d', '%d', '%f', '%s'));
                     $lead_detail_id = $wpdb->insert_id;
@@ -695,12 +698,16 @@ function map_wuf_form_field_mapping_callback(){
                     }
                 }
             }
+            
         }   //Chunk loop end
         echo $wuf_entry_index;
     }
     die();
 }
 
+/*
+ * Get Wufoo comments for a particular entry
+ */
 function map_get_comments_by_entry($api_key, $subdomain, $formhash, $entry_id){
     $wuf = new WufooApiWrapper($api_key, $subdomain);
     $comments = $wuf->getComments($formhash);
@@ -715,23 +722,13 @@ function map_get_comments_by_entry($api_key, $subdomain, $formhash, $entry_id){
     return $return;
 }
 
+/*
+ * Insert GField long detail in the long detail table
+ */
 function map_insert_lead_detail_long($lead_detail_id, $value){
     global $wpdb;
     $f = new RGFormsModel();
     $lead_detail_long = $f->get_lead_details_long_table_name();
     $query = $wpdb->prepare("INSERT INTO $lead_detail_long(lead_detail_id, value) VALUES(%d, %s)", $lead_detail_id, $value);
     $wpdb->query($query);
-}
-
-//Length of the entry in GF entries
-//apply_filters("gform_entry_field_value", $display_value, $field, $lead, $form);
-//add_filter("gform_entry_field_value", 'map_entry_length', '', 4);
-function map_entry_length($display_value, $field, $lead, $form){
-    echo '<pre>';
-    print_r($display_value);
-    print_r($field);
-    print_r($lead);
-    //print_r($form);
-    echo '</pre>';
-    return $display_value;
 }

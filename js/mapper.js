@@ -52,7 +52,7 @@ jQuery(document).ready(function(){
         }
     });
     
-    //Disable same option
+//Disable same option from multiple selects
 //    jQuery('.map_form_fields').change(function(){
 //        var val = jQuery(this).val();
 //        jQuery('.map_form_fields').not(jQuery(this)).each(function(){
@@ -134,32 +134,20 @@ jQuery(document).ready(function(){
                     map_wuf_form_data: form_data,
                     map_wuf_user_mapping: user_map,
                     map_wuf_entry_index: i
-                };
-                
-//                For Asynchronous requests, not working
-//                jQuery.ajax({
-//                    action: 'map_wuf_form_field_mapping',
-//                    type: "POST",
-//                    url: ajaxurl,
-//                    data: ajaxdata,
-//                    async: false
-//                }).done(function(response){
-//                    current = current+1;
-//                    if(response != 0){
-//                        obj.find('.map_loading').hide();
-//                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_success">Row '+response+' inserted. '+current+'/'+count+'</td></tr>');
-//                    } else {
-//                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_failure">Row '+response+' failed. '+current+'/'+count+'</td></tr>');
-//                    }
-//                });
-                    
+                }; 
 
-                jQuery.ajaxSetup({type: 'POST', async: false});
+                //jQuery.ajaxSetup({type: 'POST', async: false});
                 jQuery.post(ajaxurl, ajaxdata, function(response){
                     current = current + 1;
                     if(response != 0){
                         obj.find('.map_loading').hide();
-                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_success">Row '+response+' inserted. '+current+'/'+count+'</td></tr>');
+                        if(jQuery('.map_mapping_success').length > 0){
+                            var chunk = parseInt(jQuery('.map_mapping_success').text())+1;
+                            console.log(chunk);
+                        }
+//                        console.log(chunk);
+                        //var chunk_count = chunk+parseInt(response);
+                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_success">'+response+'</span>/'+count+'</td></tr>');
                     } else {
                         jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_failure">Row '+response+' failed. '+current+'/'+count+'</td></tr>');
                     }
