@@ -1,6 +1,7 @@
 #map_mapping_table{ margin: 25px 0; }
 .map_message{ padding: 10px !important; text-align: center; }
 #map_mapping_progress{ margin-top: 20px; }
+.map_mapping_process{ color: #444; }
 .map_mapping_success{ color: #8BD864; }
 .map_mapping_failure{ color: #D86464; }
 #map_mapping_import,
@@ -15,3 +16,18 @@
 #map_wuf_field_mapping_table{ margin-bottom: 20px; }
 #map_wuf_field_mapping_form select,
 #map_mapping_form select { width: 65%; }
+#map_mapping_progress_bar{
+    display:none;
+}
+#progressbar {
+  background-color: #444;
+  border-radius: 13px; 
+  padding: 3px;
+}
+
+#progressbar div {
+   background-color: #fb6003;
+   width: 0; 
+   height: 20px;
+   border-radius: 10px;
+}

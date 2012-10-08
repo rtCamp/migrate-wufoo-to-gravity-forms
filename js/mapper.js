@@ -2,6 +2,22 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
+
+function fireRequest(data) {        
+        var obj = jQuery('#map_wuf_field_mapping_form');
+        var total = jQuery('#map_wuf_entry_total').val();
+        return jQuery.post(ajaxurl, data, function(response){
+            if(response != 0){
+                var progw = Math.ceil((parseInt(response)/parseInt(total)) *100);
+                obj.find('.map_loading').hide();
+                jQuery('#map_progress_msgs').html('<div class="map_mapping_success"> Processed '+response+' of '+total+'.</div>');
+                jQuery('#progressbar>div').css('width',progw+'%');
+            } else {
+                jQuery('#map_progress_msgs').html('<div class="map_mapping_failure">Row '+response+' failed.</div>');
+            }
+        });
+}
+
 jQuery(document).ready(function(){
     jQuery('#map_mapping_form').submit(function(){
         jQuery(this).find('.map_loading').show();
@@ -124,6 +140,7 @@ jQuery(document).ready(function(){
             
             var current = 0;
             var count = jQuery('#map_wuf_entry_count').val();
+            var data = {};
             for(var i = 0; i < parseInt(count); i++){
                 var ajaxdata = {
                     action: 'map_wuf_form_field_mapping',
@@ -134,25 +151,21 @@ jQuery(document).ready(function(){
                     map_wuf_form_data: form_data,
                     map_wuf_user_mapping: user_map,
                     map_wuf_entry_index: i
-                }; 
-
-                //jQuery.ajaxSetup({type: 'POST', async: false});
-                jQuery.post(ajaxurl, ajaxdata, function(response){
-                    current = current + 1;
-                    if(response != 0){
-                        obj.find('.map_loading').hide();
-                        if(jQuery('.map_mapping_success').length > 0){
-                            var chunk = parseInt(jQuery('.map_mapping_success').text())+1;
-                            console.log(chunk);
-                        }
-//                        console.log(chunk);
-                        //var chunk_count = chunk+parseInt(response);
-                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_success">'+response+'</span>/'+count+'</td></tr>');
-                    } else {
-                        jQuery('#map_mapping_progress').html('<tr><td><div class="map_mapping_failure">Row '+response+' failed. '+current+'/'+count+'</td></tr>');
-                    }
-                });
+                };
+                data[i] = ajaxdata;
             }
+            
+            var startingpoint = jQuery.Deferred();
+            startingpoint.resolve();
+            jQuery('#map_mapping_progress_bar').show();
+            jQuery.each(data, function(i, v){
+                jQuery('#map_progress_msgs').html('<div class="map_mapping_process">Process started. Please wait.</div>');
+                startingpoint = startingpoint.pipe( function() {
+                     return fireRequest(v);
+                });
+            });
+            //jQuery.ajaxSetup({type: 'POST', async: false});
+            
         }
         return false;
     });

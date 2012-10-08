@@ -172,6 +172,7 @@ function map_admin_page() {
                         <span class="map_loading"></span>
                         <div class="clear"></div>
                         <table id="map_mapping_progress" class="widefat">
+                            
                         </table>
                     </form>
             <?php }
@@ -248,7 +249,19 @@ function map_wufoo_admin_page(){
             <input type="hidden" name="map_wuf_key" value="<?php echo $wuf_api_key; ?>" />
         </form>
         <?php } ?>
-        <table id="map_mapping_progress" class="widefat">
+        <table id="map_mapping_progress_bar" class="widefat">
+            <tr>
+                <td>
+                    <div id="progressbar">
+                        <div></div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td id="map_progress_msgs">
+
+                </td>
+            </tr>
         </table>
     </div>
 <?php }
@@ -428,8 +441,8 @@ function map_wuf_form_select_callback(){
         $wuf_entry_count = $wuf->getEntryCount($wuf_form);
         $wuf_form_fields = $wuf->getFields($wuf_form);
 
-        $wuf_page_size = 50;
-        $wuf_times = ceil(floatval($wuf_entry_count) / 50);
+        $wuf_page_size = 25;
+        $wuf_times = ceil(floatval($wuf_entry_count) / 25);
         $wuf_form_entries = array();
         for($i = 0; $i < $wuf_times; $i++){
             $wuf_form_entries = array_merge($wuf_form_entries,$wuf->getEntries($wuf_form, 'forms', 'pageStart='.($i*$wuf_page_size).'&pageSize='.$wuf_page_size));
@@ -478,6 +491,7 @@ function map_wuf_form_select_callback(){
         $return .= '</table>';
         $return .= '<input type="hidden" name="map_wuf_form_hash" value="'.$wuf_form.'" id="map_wuf_form_hash"/>';
         $return .= '<input type="hidden" name="map_wuf_entry_count" id="map_wuf_entry_count" value="'.$wuf_times.'"/>';
+        $return .= '<input type="hidden" name="map_wuf_entry_total" id="map_wuf_entry_total" value="'.count($wuf_form_entries).'"/>';
         $return .= '</form>';
         
         echo $return;
@@ -563,7 +577,7 @@ function map_wuf_form_field_mapping_callback(){
         
         $wuf_fields = maybe_unserialize(get_option($wuf_form.'_fields')); //Wufoo fields saved in options with form hash
         $wuf_entries = maybe_unserialize(get_option($wuf_form.'_entries')); //Wufoo entries saved in options with form hash
-        $wuf_entries_chunked = array_chunk($wuf_entries, 50); //Wufoo entries chunked in batches of n (50 here, change it above too)
+        $wuf_entries_chunked = array_chunk($wuf_entries, 25); //Wufoo entries chunked in batches of n (25 here, change it above too)
         
         //Create GForm entry
         $f = new RGFormsModel();
@@ -573,7 +587,7 @@ function map_wuf_form_field_mapping_callback(){
         global $wpdb;
         $prefix = $wpdb->prefix;
         
-        echo 'This chunk: '.count($wuf_entries_chunked[$wuf_entry_index]);
+        $chunk_count = count($wuf_entries_chunked[$wuf_entry_index]);
         foreach($wuf_entries_chunked[$wuf_entry_index] as $index => $wuf_entry){
             //Get Wufoo comments for a particular entry
             $wuf_comments = map_get_comments_by_entry($wuf_key, $wuf_sub, $wuf_form, $wuf_entry->EntryId);
@@ -699,8 +713,10 @@ function map_wuf_form_field_mapping_callback(){
                 }
             }
             
-        }   //Chunk loop end
-        echo $wuf_entry_index;
+        } //Chunk loop end
+        
+        echo $wuf_entry_index*25 + $chunk_count;
+
     }
     die();
 }
