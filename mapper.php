@@ -12,13 +12,13 @@ require_once('lib/simplexlsx.php');
 require_once('lib/excel_reader2.php');
 require_once('lib/WufooApiWrapper.php');
 /*
- * Admin page
+ * Admin pages
  */
-add_action('admin_menu', 'map_admin_pages');
+add_action('admin_menu', 'map_admin_pages', 11);
 function map_admin_pages() {
-    $hook = add_menu_page('Raw to GForms Mapper', 'Mapper', 'administrator', 'mapper', 'map_admin_page');
+    $hook = add_submenu_page('gf_edit_forms', 'Raw to GForms Mapper', 'Mapper', 'administrator', 'mapper', 'map_admin_page');
     add_action('admin_print_scripts-'.$hook, 'map_assets_enqueue');
-    $wuf_hook = add_submenu_page('mapper', 'Wufoo Entries', 'Wufoo', 'administrator', 'mapper_wufoo', 'map_wufoo_admin_page');
+    $wuf_hook = add_submenu_page('gf_edit_forms', 'Wufoo Entries', 'Wufoo', 'administrator', 'mapper_wufoo', 'map_wufoo_admin_page');
     add_action('admin_print_scripts-'.$wuf_hook, 'map_assets_enqueue');
 }
 
@@ -184,7 +184,20 @@ function map_admin_page() {
 function map_wufoo_admin_page(){
     ?>
     <div class="wrap">
-        <h2>Import entries from Wufoo</h2>
+        <h2>Import entries to Gravity Forms</h2>
+        
+        <!--Tabs-->
+<!--        <ul class="subsubsub">
+            <li><a class="current" href="#">Import from Wufoo</a> | </li>
+            <li><a class="" href="#">Import from CSV</a></li>
+        </ul>-->
+        <!--Tabs end-->
+        
+        <br style="clear:both; " />
+        <br />
+        <p class="textleft">Enter your Wufoo details below and select the forms for mapping the entries</p>
+        
+        <div class="hr-divider"></div>
         <form action="" method="post" id="map_wuf_credentials">
             <table class="form-table">
                 <tr>
@@ -440,7 +453,7 @@ function map_wuf_form_select_callback(){
         
         $wuf = new WufooApiWrapper($values['map_wuf_key'], $values['map_wuf_sub']);
         $wuf_form = $values['map_wuf_forms_list'];
-
+        $wuf_form_fields = $wuf->getFields($wuf_form);
  
         $i = 0;
         do {
@@ -778,7 +791,7 @@ function rt_map_err_handling($rt_importer_e){
 }
 
 /*
- * Create DB tables for a form
+ * Create DB tables for a Wufoo form
  */
 function map_form_fields_db($hash, $columns){
     global $wpdb;
@@ -796,6 +809,4 @@ function map_form_fields_db($hash, $columns){
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
-    
-    $create = 'CREATE TABLE IF NOT EXISTS';
 }
