@@ -216,7 +216,11 @@ function map_wufoo_admin_page(){
         $wuf_sub = $_POST['map_wuf_sub'];
         $wuf_api_key = $_POST['map_wuf_key'];
         $wuf = new WufooApiWrapper($wuf_api_key, $wuf_sub);
+        try{
         $wuf_forms = $wuf->getForms();
+        }catch (Exception $rt_importer_e){
+            rt_map_err_handling($rt_importer_e);
+        }
         if(!isset($wuf_forms) || empty($wuf_forms)){
             echo '<div class="error">Please <a href="https://'.$wuf_sub.'.wufoo.com/build/">create</a> some forms in <a href="https://'.$wuf_sub.'.wufoo.com/build/">Wufoo!</a></div>';
             return;
@@ -747,4 +751,9 @@ function map_insert_lead_detail_long($lead_detail_id, $value){
     $lead_detail_long = $f->get_lead_details_long_table_name();
     $query = $wpdb->prepare("INSERT INTO $lead_detail_long(lead_detail_id, value) VALUES(%d, %s)", $lead_detail_id, $value);
     $wpdb->query($query);
+}
+function rt_map_err_handling($rt_importer_e){
+    echo $rt_importer_e->code;
+    echo '<br/>';
+    echo $rt_importer_e->message;
 }
