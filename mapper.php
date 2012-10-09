@@ -11,7 +11,6 @@ require_once('lib/parsecsv.lib.php');
 require_once('lib/simplexlsx.php');
 require_once('lib/excel_reader2.php');
 require_once('lib/WufooApiWrapper.php');
-
 /*
  * Admin page
  */
@@ -217,7 +216,7 @@ function map_wufoo_admin_page(){
         $wuf_api_key = $_POST['map_wuf_key'];
         $wuf = new WufooApiWrapper($wuf_api_key, $wuf_sub);
         try{
-        $wuf_forms = $wuf->getForms();
+            $wuf_forms = $wuf->getForms();
         }catch (Exception $rt_importer_e){
             rt_map_err_handling($rt_importer_e);
         }
@@ -441,7 +440,27 @@ function map_wuf_form_select_callback(){
         
         $wuf = new WufooApiWrapper($values['map_wuf_key'], $values['map_wuf_sub']);
         $wuf_form = $values['map_wuf_forms_list'];
-        $wuf_form_comments = $wuf->getComments($wuf_form);
+
+ 
+        $i = 0;
+        do {
+            $wuf_tst_form_comments = $wuf->rtgetComments($wuf_form, null, 50, $i);
+            $wuf_frm_comments = $wuf_tst_form_comments->Comments;
+            set_transient($wuf_form.'_comments_'.$i, $wuf_frm_comments, 60*60*12);
+            set_transient($wuf_form.'_comments_count', $i, 0);
+            $i++;
+        } while (!empty($wuf_tst_form_comments->Comments));
+        $wuf_form_comments = array();
+        $comm_count = get_transient($wuf_form.'_comments_count');
+        
+        $i = 0;
+        for ($i = 0; $i < $comm_count; $i++) {
+            $wuf_form_comments = array_merge($wuf_form_comments, get_transient($wuf_form.'_comments_'.$i));
+        }
+        echo '<pre>';
+        print_r($wuf_form_comments);
+        echo '</pre>';
+        exit;
         $wuf_entry_count = $wuf->getEntryCount($wuf_form);
         $wuf_form_fields = $wuf->getFields($wuf_form);
 
@@ -753,7 +772,17 @@ function map_insert_lead_detail_long($lead_detail_id, $value){
     $wpdb->query($query);
 }
 function rt_map_err_handling($rt_importer_e){
-    echo $rt_importer_e->code;
-    echo '<br/>';
-    echo $rt_importer_e->message;
+    echo '<pre>';
+    print_r($rt_importer_e);
+    echo '</pre>';
+}
+
+/*
+ * Create DB tables for a form
+ */
+function map_form_fields_db(){
+    global $wpdb;
+    $prefix = $wpdb->prefix;
+    
+    $insert = 'CREATE TABLE IF NOT EXISTS';
 }

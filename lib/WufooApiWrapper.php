@@ -213,6 +213,19 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 		}
 		return $this->getHelper($url, 'Comment', 'Comments', 'CommentId');
 	}
+    
+    public function rtgetComments($formIdentifier, $entryId = null, $pageSize=25, $pageStart=0) {
+		if ($entryId) {
+			$url = $this->getFullUrl('forms/'.$formIdentifier.'/comments/'.$entryId);
+		} else {
+			$url = $this->getFullUrl('forms/'.$formIdentifier.'/comments');
+		}
+        $url= $url . '?' . 'pageStart='.$pageStart. '&pageSize='.$pageSize;
+        
+        $this->curl = new WufooCurl();
+		return $commentObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
+		//return $this->getHelper($url, 'Comment', 'Comments', 'CommentId');
+	}
 	
 	/**
 	 * submits an entry to your form
