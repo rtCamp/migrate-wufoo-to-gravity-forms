@@ -780,9 +780,22 @@ function rt_map_err_handling($rt_importer_e){
 /*
  * Create DB tables for a form
  */
-function map_form_fields_db(){
+function map_form_fields_db($hash, $columns){
     global $wpdb;
     $prefix = $wpdb->prefix;
+    $table = $prefix.'_'.$hash.'_comments';
     
-    $insert = 'CREATE TABLE IF NOT EXISTS';
+    //Need to check the $columns array before forming this query!
+    $columns = implode(" LONGTEXT,\n", $columns);
+    $sql = "CREATE TABLE $table (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        ".$columns."
+    );";
+    
+    echo $sql;
+
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+    
+    $create = 'CREATE TABLE IF NOT EXISTS';
 }
