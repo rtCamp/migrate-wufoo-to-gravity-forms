@@ -22,6 +22,7 @@ function map_admin_pages() {
     add_action('admin_print_scripts-'.$wuf_hook, 'map_assets_enqueue');
 }
 
+
 function map_admin_page() {
     ?>
     <div class="wrap">
@@ -182,6 +183,8 @@ function map_admin_page() {
 }
 
 function map_wufoo_admin_page(){
+    $wuf_sub = get_site_option('wufootogravity_subdomain');
+    $wuf_key = get_site_option('wufootogravity_apikey');
     ?>
     <div class="wrap">
         <h2>Import entries to Gravity Forms</h2>
@@ -256,7 +259,8 @@ function map_wufoo_admin_page(){
                 </tr>
                 <tr>
                     <td>
-                        <input type="submit" name="map_wuf_import_comments" id="map_wuf_import_comments" value="Next" class="button"/>
+                        <input type="submit" name="map_wuf_import_comments" id="map_wuf_import_comments" value="Next: Import Comments" class="button"/>
+                        <input type="button" name="map_wuf_skip_comments" id="map_wuf_skip_comments" value="Or: Skip Importing" class="button"/>
                         <span class="map_loading"></span>
                     </td>
                 </tr>
@@ -264,6 +268,7 @@ function map_wufoo_admin_page(){
             <input type="hidden" name="map_wuf_sub" value="<?php echo $wuf_sub; ?>" />
             <input type="hidden" name="map_wuf_key" value="<?php echo $wuf_api_key; ?>" />
         </form>
+        <input type="hidden" id="map_wuf_comment_count" name="map_wuf_comment_count" value="" />
         <?php } ?>
         <table id="map_mapping_progress_bar" class="widefat">
             <tr>
@@ -453,27 +458,84 @@ function map_wuf_form_select_callback(){
         
         $wuf = new WufooApiWrapper($values['map_wuf_key'], $values['map_wuf_sub']);
         $wuf_form = $values['map_wuf_forms_list'];
-        $wuf_form_fields = $wuf->getFields($wuf_form);
- 
-        $i = 0;
-        do {
-            $wuf_tst_form_comments = $wuf->rtgetComments($wuf_form, null, 50, $i);
-            $wuf_frm_comments = $wuf_tst_form_comments->Comments;
-            set_transient($wuf_form.'_comments_'.$i, $wuf_frm_comments, 60*60*12);
-            set_transient($wuf_form.'_comments_count', $i, 0);
-            $i++;
-        } while (!empty($wuf_tst_form_comments->Comments));
-        $wuf_form_comments = array();
-        $comm_count = get_transient($wuf_form.'_comments_count');
+        $total_comment_cont_obj = $wuf->rtgetCommentCount($wuf_form);
+        echo $total_comment_cont_obj->Count;
+        die();
+    }
+    
+}
+
+add_action('wp_ajax_map_wuf_form_comment_import', 'map_wuf_form_comment_import_callback');
+function map_wuf_form_comment_import_callback(){
+    $data = $_POST['map_wuf_form_data'];
+    foreach($data as $single){
+        $values[$single['name']] = $single['value'];
+    }
+    $wuf_form = $values['map_wuf_forms_list'];
+    $pageno = $_POST['map_wuf_request_index'];
+    
+    $wuf = new WufooApiWrapper($values['map_wuf_key'], $values['map_wuf_sub']);
+    
+    $wuf_tst_form_comments = $wuf->rtgetComments($wuf_form, null, 25, $pageno*25);
+
+    $wuf_frm_comments = $wuf_tst_form_comments->Comments;
+    comments_db_install();
+    foreach($wuf_frm_comments as $wuf_frm_comment){
+        global $wpdb;
+        $table_name = $wpdb->prefix . "_wu_2_gravity_comments_tmp";
         
-        $i = 0;
-        for ($i = 0; $i < $comm_count; $i++) {
-            $wuf_form_comments = array_merge($wuf_form_comments, get_transient($wuf_form.'_comments_'.$i));
+        $comment_exists = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_name} WHERE commentid='{$wuf_frm_comments->CommentId}' AND entryid='{$wuf_frm_comment->EntryId}';" ) );
+        
+        if(!$comment_exists){
+        $rows_affected = $wpdb->insert( 
+                $table_name, 
+                array( 
+                    'datecreated'   => $wuf_frm_comment->DateCreated,
+                    'commentid'     => $wuf_frm_comment->CommentId,
+                    'entryid'       => $wuf_frm_comment->EntryId,
+                    'text'          => $wuf_frm_comment->Text,
+                    'commentedby'   => $wuf_frm_comment->CommentedBy,
+                    'form'          => $wuf_form
+                    )
+                );
         }
-        echo '<pre>';
-        print_r($wuf_form_comments);
-        echo '</pre>';
-        exit;
+    }
+    echo count($wuf_frm_comments)+ ($pageno*25);
+    die();
+}
+
+function comments_db_install () {
+    global $wpdb;
+
+    $table_name = $wpdb->prefix . "_wu_2_gravity_comments_tmp";
+    
+    $sql = "CREATE TABLE $table_name (
+        commentid mediumint(9) NOT NULL,
+        datecreated datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+        entryid tinytext NOT NULL,
+        text text NOT NULL,
+        commentedby tinytext DEFAULT '' NOT NULL,
+        form tinytext DEFAULT '' NOT NULL,
+        UNIQUE KEY commentid (commentid)
+        );";
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+
+add_action('wp_ajax_map_wuf_map_commentators', 'map_wuf_map_commentators_callback');
+function map_wuf_map_commentators_callback(){
+        $wuf = new WufooApiWrapper($_POST['map_wuf_key'], $_POST['map_wuf_sub']);
+        $wuf_form = $_POST['map_wuf_form'];
+        $wuf_commentators = array();
+        global $wpdb;
+        $table_name = $wpdb->prefix . "_wu_2_gravity_comments_tmp";
+        $wuf_commentators = $wpdb->get_results( 
+            "
+            SELECT DISTINCT commentedby
+            FROM {$table_name}
+            WHERE form= '{$wuf_form}'               
+            "
+        );
         $wuf_entry_count = $wuf->getEntryCount($wuf_form);
         $wuf_form_fields = $wuf->getFields($wuf_form);
 
@@ -482,14 +544,7 @@ function map_wuf_form_select_callback(){
         $wuf_form_entries = array();
         for($i = 0; $i < $wuf_times; $i++){
             $wuf_form_entries = array_merge($wuf_form_entries,$wuf->getEntries($wuf_form, 'forms', 'pageStart='.($i*$wuf_page_size).'&pageSize='.$wuf_page_size));
-        }
-        
-        if(isset($wuf_form_comments) && !empty($wuf_form_comments)){
-            foreach($wuf_form_comments as $wuf_form_comment){
-                $wuf_commentators[$wuf_form_comment->CommentedBy] = array('id' => $wuf_form_comment->EntryId, 'text' => $wuf_form_comment->Text, 'date' => $wuf_form_comment->DateCreated);
-            }
-        }
-        
+        } 
         $gforms = map_get_forms();
         if(isset($gforms) && !empty($gforms)){
                 $form_select = '<select name="map_wuf_gforms_list" id="map_wuf_gforms_list">';
@@ -500,7 +555,7 @@ function map_wuf_form_select_callback(){
         } else {
             $form_select = '<strong>Please create some forms!</strong>';
         }
-        
+
         //Use this to get the entries and fields
         update_option($wuf_form.'_entries', maybe_serialize($wuf_form_entries));
         update_option($wuf_form.'_fields', maybe_serialize($wuf_form_fields));
@@ -510,10 +565,10 @@ function map_wuf_form_select_callback(){
         if(isset($wuf_commentators) && !empty($wuf_commentators)){
             $return .= '<h3>Map comments and notes:</h3>';
             $return .= '<table class="form-table" id="map_wuf_comment_mapping_table">';
-            foreach($wuf_commentators as $wuf_commentator=>$wuf_comment){
+            foreach($wuf_commentators as $wuf_c_i=>$wuf_commentator){
                 $return .= '<tr>';
-                    $return .= '<th scope="row">'.$wuf_commentator.'</th>';
-                    $return .= '<td>'.wp_dropdown_users(array('name' => $wuf_commentator, 'echo' => false)).'</td>';
+                    $return .= '<th scope="row">'.$wuf_commentator->commentedby.'</th>';
+                    $return .= '<td>'.wp_dropdown_users(array('name' => $wuf_commentator->commentedby, 'echo' => false)).'</td>';
                 $return .= '</tr>';
             }
             $return .= '</table>'; 
@@ -532,7 +587,6 @@ function map_wuf_form_select_callback(){
         
         echo $return;
         die();
-    }
 }
 
 /*
@@ -549,7 +603,8 @@ function map_wuf_form_fields_callback(){
         $wuf = new WufooApiWrapper($_POST['map_wuf_key'], $_POST['map_wuf_sub']);
         $wuf_form = $values['map_wuf_form_hash'];
         $gform = $values['map_wuf_gforms_list'];
-        
+        echo $wuf_form;
+        echo $gform;
         //Retain only the author map list
         unset($values['map_wuf_form_hash']);
         unset($values['map_wuf_gforms_list']);
@@ -596,13 +651,11 @@ function map_wuf_form_fields_callback(){
 add_action('wp_ajax_map_wuf_form_field_mapping', 'map_wuf_form_field_mapping_callback');
 function map_wuf_form_field_mapping_callback(){
     if(isset($_POST['action']) && $_POST['action'] == 'map_wuf_form_field_mapping'){
-        
         //The actual mapping: Gfield ID = Wufoo field ID
         $data = $_POST['map_wuf_form_data'];
         foreach($data as $single){
             $values[$single['name']] = $single['value'];
         }
-        
         //Other required details
         $gform = $_POST['map_gform'];   //GForm ID
         $wuf_form = $_POST['map_wuf_form_hash']; //Wufoo form hash
@@ -614,7 +667,6 @@ function map_wuf_form_field_mapping_callback(){
         $wuf_fields = maybe_unserialize(get_option($wuf_form.'_fields')); //Wufoo fields saved in options with form hash
         $wuf_entries = maybe_unserialize(get_option($wuf_form.'_entries')); //Wufoo entries saved in options with form hash
         $wuf_entries_chunked = array_chunk($wuf_entries, 25); //Wufoo entries chunked in batches of n (25 here, change it above too)
-        
         //Create GForm entry
         $f = new RGFormsModel();
         $c = new GFCommon();
@@ -626,7 +678,8 @@ function map_wuf_form_field_mapping_callback(){
         $chunk_count = count($wuf_entries_chunked[$wuf_entry_index]);
         foreach($wuf_entries_chunked[$wuf_entry_index] as $index => $wuf_entry){
             //Get Wufoo comments for a particular entry
-            $wuf_comments = map_get_comments_by_entry($wuf_key, $wuf_sub, $wuf_form, $wuf_entry->EntryId);
+            
+            $wuf_comments = map_get_comments_by_entry($wuf_form, $wuf_entry->EntryId);
             foreach($values as $key => $val){
                 $field = explode('-', $key);
                 $field = $field[1];
@@ -739,16 +792,16 @@ function map_wuf_form_field_mapping_callback(){
                 //Insert comments as notes for the corresponding user map
                 if(isset($wuf_comments) && !empty($wuf_comments)){
                     foreach($wuf_comments as $wuf_comment){
-                        if(array_key_exists($wuf_comment->CommentedBy, $wuf_user_mapping)){
+                        if(array_key_exists($wuf_comment->commentedby, $wuf_user_mapping)){
                             $table_name = $f->get_lead_notes_table_name();
-                            $user = get_user_by('id', $wuf_user_mapping[$wuf_comment->CommentedBy]);
-                            $sql = $wpdb->prepare("INSERT INTO $table_name(lead_id, user_id, user_name, value, date_created) values(%d, %d, %s, %s, %s)", $lead_id, $wuf_user_mapping[$wuf_comment->CommentedBy], $user->display_name, $wuf_comment->Text, $wuf_comment->DateCreated);
+                            $user = get_user_by('id', $wuf_user_mapping[$wuf_comment->commentedby]);
+                            $sql = $wpdb->prepare("INSERT INTO $table_name(lead_id, user_id, user_name, value, date_created) values(%d, %d, %s, %s, %s)", $lead_id, $wuf_user_mapping[$wuf_comment->commentedby], $user->display_name, $wuf_comment->text, $wuf_comment->datecreated);
                             $wpdb->query($sql);
                         }
                     }
                 }
             }
-            
+           
         } //Chunk loop end
         
         echo $wuf_entry_index*25 + $chunk_count;
@@ -760,18 +813,12 @@ function map_wuf_form_field_mapping_callback(){
 /*
  * Get Wufoo comments for a particular entry
  */
-function map_get_comments_by_entry($api_key, $subdomain, $formhash, $entry_id){
-    $wuf = new WufooApiWrapper($api_key, $subdomain);
-    $comments = $wuf->getComments($formhash);
-    $return = array();
-    if(isset($comments) && !empty($comments)){
-        foreach($comments as $comment){
-            if($comment->EntryId == $entry_id){
-                $return[] = $comment;
-            }
-        }
-    }
-    return $return;
+function map_get_comments_by_entry($formhash, $entry_id){
+    global $wpdb;
+    $table_name = $wpdb->prefix . "_wu_2_gravity_comments_tmp";
+    $sql = "SELECT * FROM {$table_name} WHERE entryid='{$entry_id}' AND form='{$formhash}'";
+    $comments= $wpdb->get_results($sql);  
+    return $comments;
 }
 
 /*
@@ -804,8 +851,6 @@ function map_form_fields_db($hash, $columns){
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         ".$columns."
     );";
-    
-    echo $sql;
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);

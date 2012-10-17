@@ -3,7 +3,7 @@
  * and open the template in the editor.
  */
 
-function fireRequest(data) {        
+function fireFieldRequest(data) {        
         var obj = jQuery('#map_wuf_field_mapping_form');
         var total = jQuery('#map_wuf_entry_total').val();
         return jQuery.post(ajaxurl, data, function(response){
@@ -15,7 +15,41 @@ function fireRequest(data) {
             } else {
                 jQuery('#map_progress_msgs').html('<div class="map_mapping_failure">Row '+response+' failed.</div>');
             }
+            
         });
+}
+
+function fireCommentRequest(data){
+    
+    var total = jQuery('#map_wuf_comment_count').val();
+    return jQuery.post(ajaxurl, data, function(response){
+            if(response != 0){
+                var progw = Math.ceil((parseInt(response)/parseInt(total)) *100);
+                jQuery('.map_loading').hide();
+                jQuery('#map_progress_msgs').html('<div class="map_mapping_success"> Processed '+response+' of '+total+'.</div>');
+                jQuery('#progressbar>div').css('width',progw+'%');
+            } else {
+                jQuery('#map_progress_msgs').html('<div class="map_mapping_failure">Row '+response+' failed.</div>');
+            }
+            if(response == total){
+               post_comment_import();
+            }
+            
+    });
+}
+function post_comment_import(){
+    var obj = jQuery('#map_wuf_forms_list_form');
+     jQuery('#map_mapping_progress_bar').hide();
+                var commentatordata = {
+                    action: 'map_wuf_map_commentators',
+                    map_wuf_key: jQuery('#map_wuf_key').val(),
+                    map_wuf_sub: jQuery('#map_wuf_sub').val(),
+                    map_wuf_form: jQuery('#map_wuf_forms_list').val()
+                }
+                jQuery.post(ajaxurl, commentatordata, function(response){
+                    obj.find('.map_loading').hide();
+                    obj.after(response);
+                });
 }
 
 jQuery(document).ready(function(){
@@ -75,7 +109,9 @@ jQuery(document).ready(function(){
 //            jQuery(this).find('option[value="'+val+'"]').attr('disabled', 'disabled');
 //        });
 //    });
-
+    jQuery('#map_wuf_skip_comments').live('click', function(){
+        post_comment_import();
+    });
     jQuery('#map_wuf_forms_list_form').submit(function(){
         var obj = jQuery(this);
         obj.find('#map_wuf_forms_list_error').remove();
@@ -90,7 +126,30 @@ jQuery(document).ready(function(){
             };
             jQuery.post(ajaxurl, ajaxdata, function(response){
                 obj.find('.map_loading').hide();
-                obj.after(response);
+                    jQuery('input#map_wuf_comment_count').val(response);
+                    commentcountstr = response + ' comments found';
+                    obj.after(commentcountstr);
+                    var countreq = Math.ceil((response/25));
+                    var data = {};
+                    for(var i = 0; i < parseInt(countreq); i++){
+                        var ajaxdata = {
+                            action: 'map_wuf_form_comment_import',
+                            map_wuf_form_data: form_data,
+                            map_wuf_request_index: i
+                        };
+                        data[i] = ajaxdata;
+                    }
+
+                    var newstartingpoint = jQuery.Deferred();
+                    newstartingpoint.resolve();
+                    jQuery('#map_mapping_progress_bar').show();
+                    jQuery.each(data, function(i, v){
+                        jQuery('#map_progress_msgs').html('<div class="map_mapping_process">Process started. Please wait.</div>');
+                        newstartingpoint = newstartingpoint.pipe( function() {
+                             return fireCommentRequest(v);
+                        });
+                    });
+                    
             });
         }
         return false;
@@ -161,10 +220,10 @@ jQuery(document).ready(function(){
             jQuery.each(data, function(i, v){
                 jQuery('#map_progress_msgs').html('<div class="map_mapping_process">Process started. Please wait.</div>');
                 startingpoint = startingpoint.pipe( function() {
-                     return fireRequest(v);
+                     return fireFieldRequest(v);
                 });
             });
-            //jQuery.ajaxSetup({type: 'POST', async: false});
+            
             
         }
         return false;

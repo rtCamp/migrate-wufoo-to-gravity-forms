@@ -1,40 +1,39 @@
 <?php
+    class ValueObject {
 
-class ValueObject {
-	
-	public function __construct($obj) {
-		if ($obj) {
-			foreach ($obj as $key => $value) {
-				$this->setProperty($key, $value, (isset($obj->ID) ? $obj->ID : ''));
-			}
-		}
-	}
-	
-	protected function setProperty($key, $value, $parentId) {
-		$this->$key = $value;
-	}
-	
-}
+        public function __construct($obj) {
+            if ($obj) {
+                foreach ($obj as $key => $value) {
+                    $this->setProperty($key, $value, (isset($obj->ID) ? $obj->ID : ''));
+                }
+            }
+        }
 
-class WufooFieldCollection {
+        protected function setProperty($key, $value, $parentId) {
+            $this->$key = $value;
+        }
+
+    }
+
+    class WufooFieldCollection {
 	
 	public $Fields = array();
 	public $Hash = array();
 	
 	public function getField($id) {
-		return $this->Hash[$id];
+            return $this->Hash[$id];
 	}
 	
 	public function getParent($subfield) {
-		return $this->Fields[$subfield->ParentID];
+            return $this->Fields[$subfield->ParentID];
 	}
 	
-}
+    }
 
-class WufooUser extends ValueObject {
+    class WufooUser extends ValueObject {
 	
 	public function __construct($obj = null) {
-		parent::__construct($obj);
+            parent::__construct($obj);
 	}
 	
 	public $Name;
@@ -49,12 +48,12 @@ class WufooUser extends ValueObject {
 	public $LinkEntriesCount;
 	public $LinkWidgets;
 	
-}
+    }
 
-class WufooField extends ValueObject {
+    class WufooField extends ValueObject {
 	
 	public function __construct($obj = null) {
-		parent::__construct($obj);
+            parent::__construct($obj);
 	}
 	
 	public $Title;
@@ -62,28 +61,29 @@ class WufooField extends ValueObject {
 	public $ID;
 	
 	protected function setProperty($key, $value, $parentID) {
-		switch ($key) {
-			case 'SubFields':
-				if ($value) {
-					foreach ($value as $subfield) {
-						$subfield->ParentID = $parentID;
-						$this->SubFields[$subfield->ID] = $subfield;
-					}
-				}
-				break;
-			case 'Choices':
-				foreach ($value as $choice) {
-					$this->Choices[] = $choice;
-				}
-				break;
-			default:
-				$this->$key = $value;
-				break;
+            switch ($key) {
+                case 'SubFields':
+                    if ($value) {
+                        foreach ($value as $subfield) {
+                            $subfield->ParentID = $parentID;
+                            $this->SubFields[$subfield->ID] = $subfield;
+                        }
+                    }
+                    break;
+                case 'Choices':
+                    foreach ($value as $choice) {
+                        $this->Choices[] = $choice;
+                    }
+                    break;
+                default:
+                    $this->$key = $value;
+                    break;
 		} 
 	}
 	
 	
-}
+    }
+
 
 class WufooSubfield extends ValueObject {
 	

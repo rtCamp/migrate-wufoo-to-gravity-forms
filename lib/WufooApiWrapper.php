@@ -1,13 +1,12 @@
 <?php
+    require_once('WufooApiWrapperBase.php');
+    require_once('WufooValueObjects.php');
 
-require_once('WufooApiWrapperBase.php');
-require_once('WufooValueObjects.php');
-
-/**
- * API Main.
- * @author Timothy S Sabat
- */
-class WufooApiWrapper extends WufooApiWrapperBase {
+    /**
+    * API Main.
+    * @author Timothy S Sabat
+    */
+    class WufooApiWrapper extends WufooApiWrapperBase {
 	
 	protected $apiKey;
 	protected $subdomain;
@@ -24,9 +23,9 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function __construct($apiKey, $subdomain, $domain = 'wufoo.com') {
-		$this->apiKey = $apiKey;
-		$this->subdomain = $subdomain;
-		$this->domain = $domain;		
+            $this->apiKey = $apiKey;
+            $this->subdomain = $subdomain;
+            $this->domain = $domain;		
 	}
 	
 	/* -------------------------------
@@ -40,8 +39,8 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */			
 	public function getUsers() {
-		$url = $this->getFullUrl('users');
-		return $this->getHelper($url, 'User', 'Users');
+            $url = $this->getFullUrl('users');
+            return $this->getHelper($url, 'User', 'Users');
 	}
 	
 	/**
@@ -52,8 +51,8 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getForms($formIdentifier = null) {
-		$url = ($formIdentifier) ? $this->getFullUrl('forms/'.$formIdentifier) : $this->getFullUrl('forms');
-		return $this->getHelper($url, 'Form', 'Forms');
+            $url = ($formIdentifier) ? $this->getFullUrl('forms/'.$formIdentifier) : $this->getFullUrl('forms');
+            return $this->getHelper($url, 'Form', 'Forms');
 	}
 	
 	/**
@@ -65,21 +64,21 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getFields($formIdentifier, $from = 'forms') {
-		$url = $this->getFullUrl($from.'/'.$formIdentifier.'/fields');
-		$this->curl = new WufooCurl();
-		$fields = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
-		$fieldHelper = new WufooFieldCollection();
-		
-		foreach ($fields->Fields as $field) {
-			$fieldHelper->Fields[$field->ID] = new WufooField($field);
-			$fieldHelper->Hash[$field->ID] = $field;
-			if ($field->SubFields) {
-				foreach ($field->SubFields as $subfield) {
-					$fieldHelper->Hash[$subfield->ID] = $subfield;
-				}
-			}
-		}
-		return $fieldHelper;
+            $url = $this->getFullUrl($from.'/'.$formIdentifier.'/fields');
+            $this->curl = new WufooCurl();
+            $fields = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
+            $fieldHelper = new WufooFieldCollection();
+
+            foreach ($fields->Fields as $field) {
+                $fieldHelper->Fields[$field->ID] = new WufooField($field);
+                $fieldHelper->Hash[$field->ID] = $field;
+                if ($field->SubFields) {
+                    foreach ($field->SubFields as $subfield) {
+                        $fieldHelper->Hash[$subfield->ID] = $subfield;
+                    }
+                }
+            }
+            return $fieldHelper;
 	}
 	
 	/**
@@ -93,9 +92,9 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getEntries($identifier, $from = 'forms', $getArgs = '', $index = 'EntryId') {
-		$url = $this->getFullUrl($from.'/'.$identifier.'/entries');
-		$url.= ($getArgs) ? '?'. ltrim($getArgs, '?') : '';
-		return $this->getHelper($url, 'Entry', 'Entries', $index);
+            $url = $this->getFullUrl($from.'/'.$identifier.'/entries');
+            $url.= ($getArgs) ? '?'. ltrim($getArgs, '?') : '';
+            return $this->getHelper($url, 'Entry', 'Entries', $index);
 	}
 	
 	/**
@@ -108,34 +107,34 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getEntryCount($identifier, $from = 'forms', $getArgs = '') {
-		$url = $this->getFullUrl($from.'/'.$identifier.'/entries/count');
-		$url.= ($getArgs) ? '?'. ltrim($getArgs, '?') : '';
-		$this->curl = new WufooCurl();
-		$countObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
-		return $countObject->EntryCount;
+            $url = $this->getFullUrl($from.'/'.$identifier.'/entries/count');
+            $url.= ($getArgs) ? '?'. ltrim($getArgs, '?') : '';
+            $this->curl = new WufooCurl();
+            $countObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
+            return $countObject->EntryCount;
 	} 
 	
-    /**
-    * Gets the entry count for a specific day.
-    *  
-    *
-    * @param string $identifier a URL or Hash
-    * @return int today's entry count
-    * @author Baylor Rae'
-    */
+        /**
+        * Gets the entry count for a specific day.
+        *  
+        *
+        * @param string $identifier a URL or Hash
+        * @return int today's entry count
+        * @author Baylor Rae'
+        */
 	public function getEntryCountToday($identifier) {
-		$url = $this->getFullUrl($from.'/'.$identifier) . '?includeTodayCount=true';
-		$this->curl = new WufooCurl();
-		$countObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
+            $url = $this->getFullUrl($from.'/'.$identifier) . '?includeTodayCount=true';
+            $this->curl = new WufooCurl();
+            $countObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
 
-		$ret = 0;
-		if (isset($countObject->EntryCountToday)) {
-			$ret = $countObject->EntryCountToday;
-		} elseif (isset($countObject->Forms[0]->EntryCountToday)) {
-			$ret = $countObject->Forms[0]->EntryCountToday;
-		}
+            $ret = 0;
+            if (isset($countObject->EntryCountToday)) {
+                $ret = $countObject->EntryCountToday;
+            } elseif (isset($countObject->Forms[0]->EntryCountToday)) {
+                $ret = $countObject->Forms[0]->EntryCountToday;
+            }
 
-		return $ret;
+            return $ret;
 	}
 	
 	/**
@@ -146,8 +145,8 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getReports($reportIdentifier) {
-		$url = ($reportIdentifier) ? $this->getFullUrl('reports/'.$reportIdentifier) : $this->getFullUrl('reports');
-		return $this->getHelper($url, 'Report', 'Reports');
+            $url = ($reportIdentifier) ? $this->getFullUrl('reports/'.$reportIdentifier) : $this->getFullUrl('reports');
+            return $this->getHelper($url, 'Report', 'Reports');
 	}
 	
 	/**
@@ -158,8 +157,8 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getWidgets($reportIdentifier) {
-		$url = $this->getFullUrl('reports/'.$reportIdentifier.'/widgets');
-		return $this->getHelper($url, 'Widget', 'Widgets');
+            $url = $this->getFullUrl('reports/'.$reportIdentifier.'/widgets');
+            return $this->getHelper($url, 'Widget', 'Widgets');
 	}
 	
 	/**
@@ -170,7 +169,7 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getReportFields($reportIdentifier) {
-		return $this->getFields($reportIdentifier, 'reports');
+            return $this->getFields($reportIdentifier, 'reports');
 	}
 	
 	/**
@@ -182,7 +181,7 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getReportEntries($reportIdentifier, $getArgs = '') {
-		return $this->getEntries($reportIdentifier, 'reports', $getArgs);
+            return $this->getEntries($reportIdentifier, 'reports', $getArgs);
 	}
 	
 	/**
@@ -194,17 +193,18 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getReportEntryCount($reportIdentifier, $getArgs = '') {
-		return $this->getEntryCount($reportIdentifier, 'reports', $getArgs);
+            return $this->getEntryCount($reportIdentifier, 'reports', $getArgs);
 	}
 	
 	/**
-	 * Gets comments for a given form and (optionally) entry.	
+	 * Gets comments for a given form and (optionally) entry.
+         * Marked for deletion, the API doesn't give all comments only the first 25.	
 	 *
 	 * @param string $formIdentifier 
 	 * @param string $entryId (optional).  If provided, narrows the filter to the entry id.
 	 * @return array of Comment Value Objects by EntryId
 	 * @author Timothy S Sabat
-	 */
+	 
 	public function getComments($formIdentifier, $entryId = null) {
 		if ($entryId) {
 			$url = $this->getFullUrl('forms/'.$formIdentifier.'/comments/'.$entryId);
@@ -213,18 +213,37 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 		}
 		return $this->getHelper($url, 'Comment', 'Comments', 'CommentId');
 	}
-    
-    public function rtgetComments($formIdentifier, $entryId = null, $pageSize=25, $pageStart=0) {
-		if ($entryId) {
-			$url = $this->getFullUrl('forms/'.$formIdentifier.'/comments/'.$entryId);
-		} else {
-			$url = $this->getFullUrl('forms/'.$formIdentifier.'/comments');
-		}
-        $url= $url . '?' . 'pageStart='.$pageStart. '&pageSize='.$pageSize;
-        
-        $this->curl = new WufooCurl();
-		return $commentObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
-		//return $this->getHelper($url, 'Comment', 'Comments', 'CommentId');
+         *
+         */
+        /**
+	 * Gets comments for a given form in a paginated manner (as per the new API) and (optionally) entry.	
+	 *
+	 * @param string $formIdentifier 
+	 * @param string $entryId (optional).  If provided, narrows the filter to the entry id.
+         * @param integer $pageSize (default 25). This is the pagesize wufoo is most comfortable with.
+         * @param integer $pageStart (default 0). This decides the count from which the page should start. Like offset. Helps in pagination.
+	 * @return array of Comment Value Objects by EntryId
+	 * @author Saurabh Shukla
+	 */
+        public function rtgetCommentCount($formIdentifier, $entryId = null) {
+            
+            $url = $this->getFullUrl('forms/'.$formIdentifier.'/comments/count');
+            if ($entryId)
+            $url= $url . '?' . 'entryID='.$entryId;
+                
+            $this->curl = new WufooCurl();
+            return $commentCountObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
+	}
+        public function rtgetComments($formIdentifier, $entryId = null, $pageSize=25, $pageStart=0) {
+            if ($entryId) {
+                $url = $this->getFullUrl('forms/'.$formIdentifier.'/comments/'.$entryId);
+            } else {
+                $url = $this->getFullUrl('forms/'.$formIdentifier.'/comments');
+            }
+            $url= $url . '?' . 'pageStart='.$pageStart. '&pageSize='.$pageSize;
+
+            $this->curl = new WufooCurl();
+            return $commentObject = json_decode($this->curl->getAuthenticated($url, $this->apiKey));
 	}
 	
 	/**
@@ -236,14 +255,14 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function entryPost($formIdentifier, $wufooSubmitFields) {
-		$url = $this->getFullUrl('forms/'.$formIdentifier.'/entries');
-		$postParams = array();
-		foreach ($wufooSubmitFields as $field) {
-			$postParams[$field->getId()] = $field->getValue();
-		}
-		$curl = new WufooCurl();
-		$response = $curl->postAuthenticated($postParams, $url, $this->apiKey);
-		return new PostResponse($response);
+            $url = $this->getFullUrl('forms/'.$formIdentifier.'/entries');
+            $postParams = array();
+            foreach ($wufooSubmitFields as $field) {
+                $postParams[$field->getId()] = $field->getValue();
+            }
+            $curl = new WufooCurl();
+            $response = $curl->postAuthenticated($postParams, $url, $this->apiKey);
+            return new PostResponse($response);
 	}
 	
 	/**
@@ -256,27 +275,27 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 	 * @author Timothy S Sabat
 	 */
 	public function getLogin($email, $password, $integrationKey, $subdomain = '') {
-		$args = array('email' => $email, 'password' => $password, 'integrationKey' => $integrationKey, 'subdomain' => $subdomain);
-		$url = 'http://wufoo.com/api/v3/login/';
-		$response = $curl->postAuthenticated($args, $url, null);
-		return new PostResponse($response);
+            $args = array('email' => $email, 'password' => $password, 'integrationKey' => $integrationKey, 'subdomain' => $subdomain);
+            $url = 'http://wufoo.com/api/v3/login/';
+            $response = $curl->postAuthenticated($args, $url, null);
+            return new PostResponse($response);
 	}
 	
 	
 	public function webHookPut($formIdentifier, $webHookUrl, $handshakeKey, $metadata = false) {
-		$url = $this->getFullUrl('forms/'.$formIdentifier.'/webhooks');
-		$this->curl = new WufooCurl();
-		$args = array('url' => $webHookUrl, 'handshakeKey' => $handshakeKey, 'metadata' => $metadata);
-		$result = json_decode($this->curl->putAuthenticated($args, $url, $this->apiKey));
-		return new WebHookResponse($result->WebHookPutResult->Hash);
+            $url = $this->getFullUrl('forms/'.$formIdentifier.'/webhooks');
+            $this->curl = new WufooCurl();
+            $args = array('url' => $webHookUrl, 'handshakeKey' => $handshakeKey, 'metadata' => $metadata);
+            $result = json_decode($this->curl->putAuthenticated($args, $url, $this->apiKey));
+            return new WebHookResponse($result->WebHookPutResult->Hash);
 	}
 	
 	public function webHookDelete($formIdentifier, $hash) {
-		$url = $this->getFullUrl('forms/'.$formIdentifier.'/webhooks/'.$hash);
-		$this->curl = new WufooCurl();
-		$result = json_decode($this->curl->deleteAuthenticated(array(), $url, $this->apiKey));
-		return new WebHookResponse($result->WebHookDeleteResult->Hash);
+            $url = $this->getFullUrl('forms/'.$formIdentifier.'/webhooks/'.$hash);
+            $this->curl = new WufooCurl();
+            $result = json_decode($this->curl->deleteAuthenticated(array(), $url, $this->apiKey));
+            return new WebHookResponse($result->WebHookDeleteResult->Hash);
 	}
-}
+    }
 
 ?>
