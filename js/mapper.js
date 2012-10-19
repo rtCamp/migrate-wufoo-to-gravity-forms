@@ -34,6 +34,7 @@ function fireCommentRequest(data){
             if(response == total){
                var obj = jQuery('#map_wuf_forms_list_form');
      jQuery('#map_mapping_progress_bar').hide();
+     obj.find('.map_loading').show();
                 var commentatordata = {
                     action: 'map_wuf_map_commentators',
                     map_wuf_key: jQuery('#map_wuf_key').val(),
@@ -112,6 +113,7 @@ jQuery(document).ready(function(){
     jQuery('#map_wuf_skip_comments').click(function(){
         var obj = jQuery('#map_wuf_forms_list_form');
      jQuery('#map_mapping_progress_bar').hide();
+     obj.find('.map_loading').show();
                 var commentatordata = {
                     action: 'map_wuf_map_commentators',
                     map_wuf_key: jQuery('#map_wuf_key').val(),
