@@ -32,13 +32,7 @@ function fireCommentRequest(data){
                 jQuery('#map_progress_msgs').html('<div class="map_mapping_failure">Row '+response+' failed.</div>');
             }
             if(response == total){
-               post_comment_import();
-            }
-            
-    });
-}
-function post_comment_import(){
-    var obj = jQuery('#map_wuf_forms_list_form');
+               var obj = jQuery('#map_wuf_forms_list_form');
      jQuery('#map_mapping_progress_bar').hide();
                 var commentatordata = {
                     action: 'map_wuf_map_commentators',
@@ -50,7 +44,13 @@ function post_comment_import(){
                     obj.find('.map_loading').hide();
                     obj.after(response);
                 });
+
+            }
+            
+    });
 }
+function post_comment_import(){
+    }
 
 jQuery(document).ready(function(){
     jQuery('#map_mapping_form').submit(function(){
@@ -109,8 +109,20 @@ jQuery(document).ready(function(){
 //            jQuery(this).find('option[value="'+val+'"]').attr('disabled', 'disabled');
 //        });
 //    });
-    jQuery('#map_wuf_skip_comments').live('click', function(){
-        post_comment_import();
+    jQuery('#map_wuf_skip_comments').click(function(){
+        var obj = jQuery('#map_wuf_forms_list_form');
+     jQuery('#map_mapping_progress_bar').hide();
+                var commentatordata = {
+                    action: 'map_wuf_map_commentators',
+                    map_wuf_key: jQuery('#map_wuf_key').val(),
+                    map_wuf_sub: jQuery('#map_wuf_sub').val(),
+                    map_wuf_form: jQuery('#map_wuf_forms_list').val()
+                }
+                jQuery.post(ajaxurl, commentatordata, function(response){
+                    obj.find('.map_loading').hide();
+                    obj.after(response);
+                });
+
     });
     jQuery('#map_wuf_forms_list_form').submit(function(){
         var obj = jQuery(this);

@@ -1,7 +1,11 @@
 <?php
 /*
-Plugin Name: Mapper
-Plugin Author: rtCamp
+Plugin Name: Wufoo to Gravity Importer
+Plugin URI: http://rtcamp.com/
+Description: Wuffo Form to Garvity Forms migrator!
+Version: 0.1
+Author: rtCamp
+Author URI: http://rtcamp.com
 */
 
 /*
@@ -524,6 +528,11 @@ function comments_db_install () {
 
 add_action('wp_ajax_map_wuf_map_commentators', 'map_wuf_map_commentators_callback');
 function map_wuf_map_commentators_callback(){
+    global $blog_id;
+        $grav_users = get_users(array(
+	'blog_id' =>$blog_id));
+        print_r($grav_users);
+        
         $wuf = new WufooApiWrapper($_POST['map_wuf_key'], $_POST['map_wuf_sub']);
         $wuf_form = $_POST['map_wuf_form'];
         $wuf_commentators = array();
@@ -561,14 +570,17 @@ function map_wuf_map_commentators_callback(){
         update_option($wuf_form.'_fields', maybe_serialize($wuf_form_fields));
         
         //Return the markup
+        foreach($grav_users as $user){
+            $user_options .= '<option value="'.$user->ID.'">'.$user->user_login.'</option>';
+        }
         $return = '<form action="" method="post" id="map_wuf_comment_mapping_form">';
         if(isset($wuf_commentators) && !empty($wuf_commentators)){
             $return .= '<h3>Map comments and notes:</h3>';
             $return .= '<table class="form-table" id="map_wuf_comment_mapping_table">';
             foreach($wuf_commentators as $wuf_c_i=>$wuf_commentator){
                 $return .= '<tr>';
-                    $return .= '<th scope="row">'.$wuf_commentator->commentedby.'</th>';
-                    $return .= '<td>'.wp_dropdown_users(array('name' => $wuf_commentator->commentedby, 'echo' => false)).'</td>';
+                    $return .= '<th scope="row">'.$wuf_commentator->commentedby.'</th>';                    
+                    $return .= '<td><select name="'.$wuf_commentator->commentedby.'">'.$user_options.'</select></td>';
                 $return .= '</tr>';
             }
             $return .= '</table>'; 
