@@ -531,7 +531,6 @@ function map_wuf_map_commentators_callback(){
     global $blog_id;
         $grav_users = get_users(array(
 	'blog_id' =>$blog_id));
-        print_r($grav_users);
         
         $wuf = new WufooApiWrapper($_POST['map_wuf_key'], $_POST['map_wuf_sub']);
         $wuf_form = $_POST['map_wuf_form'];
