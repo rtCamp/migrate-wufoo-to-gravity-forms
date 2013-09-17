@@ -1,16 +1,11 @@
 <?php
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 
 /**
  * Description of rtWufooToGravity
  *
  * @author sourabh
  */
-class rtWufooToGravity {
+class rtCSV {
 
     function __construct() {
         $this->active = RGForms::get("active") == "" ? null : RGForms::get("active");
@@ -56,7 +51,7 @@ class rtWufooToGravity {
                 <tr>
                     <th scope="row"><label for="map_forms_list">Select a Gravity Form:</label></th>
                     <td>
-                        <?php echo $this->gforms_select_ui(); ?>
+        <?php echo $this->gforms_select_ui(); ?>
                     </td>
                 </tr>
                 <tr>
@@ -282,7 +277,7 @@ class rtWufooToGravity {
                         <tr>
                             <th scope="row"><label for="map_wuf_forms_list">Select a Form:</label></th>
                             <td>
-                                <?php echo $form_select; ?>
+            <?php echo $form_select; ?>
                             </td>
                         </tr>
                         <tr>
@@ -297,7 +292,7 @@ class rtWufooToGravity {
                     <input type="hidden" name="map_wuf_key" value="<?php echo $wuf_api_key; ?>" />
                 </form>
                 <input type="hidden" id="map_wuf_comment_count" name="map_wuf_comment_count" value="" />
-            <?php } ?>
+        <?php } ?>
             <table id="map_mapping_progress_bar" class="widefat">
                 <tr>
                     <td>

@@ -1,14 +1,5 @@
 <?php
 /*
-  Plugin Name: Wufoo to Gravity Importer
-  Plugin URI: http://rtcamp.com/
-  Description: Wuffo Form to Garvity Forms migrator!
-  Version: 0.1
-  Author: rtCamp
-  Author URI: http://rtcamp.com
- */
-
-/*
  * Parse CSV library
  */
 require_once('lib/parsecsv.lib.php');
@@ -145,7 +136,8 @@ function map_admin_page() {
                                         ?>
                                     </td>
                                 </tr>
-                            <?php }
+                                <?php
+                            }
                         }
                         ?>
                         <?php
@@ -182,10 +174,10 @@ function map_admin_page() {
 
                     </table>
                 </form>
-        <?php
+                <?php
+            }
         }
-    }
-    ?>
+        ?>
     </div>
     <?php
 }
@@ -262,7 +254,7 @@ function map_wufoo_admin_page() {
                     <tr>
                         <th scope="row"><label for="map_wuf_forms_list">Select a Form:</label></th>
                         <td>
-        <?php echo $form_select; ?>
+                            <?php echo $form_select; ?>
                         </td>
                     </tr>
                     <tr>
@@ -277,7 +269,7 @@ function map_wufoo_admin_page() {
                 <input type="hidden" name="map_wuf_key" value="<?php echo $wuf_api_key; ?>" />
             </form>
             <input type="hidden" id="map_wuf_comment_count" name="map_wuf_comment_count" value="" />
-    <?php } ?>
+        <?php } ?>
         <table id="map_mapping_progress_bar" class="widefat">
             <tr>
                 <td>
@@ -293,7 +285,7 @@ function map_wufoo_admin_page() {
             </tr>
         </table>
     </div>
-<?php
+    <?php
 }
 
 /*

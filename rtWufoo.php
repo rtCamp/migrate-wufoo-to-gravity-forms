@@ -1,25 +1,47 @@
 <?php
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 
 /**
- * Description of rtWufoo
+ * Main plugin class, does WordPress side adjustments for Wufoo API
  *
  * @author sourabh
  */
 class rtWufoo {
 
+    /**
+     *
+     * @var string The Wufoo subdomain
+     */
     var $subdomain = '';
+
+    /**
+     *
+     * @var string The Wufoo API key
+     */
     var $api_key = '';
+
+    /**
+     *
+     * @var object Instance of WufooAPIWrapper
+     */
     var $wufoo = null;
 
+    /**
+     *
+     * @var object Instance of rtProgress for rendering the progress bar UI
+     */
+    var $progress = null;
+
+    /**
+     * Hooks into admin_menu action to initialise the UI
+     */
     function __construct() {
         add_action('admin_menu', array($this, 'admin'), 11);
     }
 
+    /**
+     * Adds the submenu to Gravity Forms menu on the dashboard
+     * Enqueues the necessary js and css
+     */
     function admin() {
         $hook = add_submenu_page(
                 'gf_edit_forms', 'Wufoo to Gravity', 'Wufoo Importer', 'administrator', 'mapper_wufoo', array($this, 'ui')
@@ -27,6 +49,9 @@ class rtWufoo {
         add_action('admin_print_scripts-' . $hook, 'map_assets_enqueue');
     }
 
+    /**
+     *
+     */
     function ui() {
         ?>
         <div class="wrap">
@@ -48,16 +73,28 @@ class rtWufoo {
         <?php
     }
 
+    /**
+     * Saves Wufoo API credentials in the options table
+     *
+     * @param string $subdomain Wufoo subdomain
+     * @param string $api_key Wufoo API key
+     */
     function save_options($subdomain, $api_key) {
         update_site_option('rt_wufoo_gravity_subdomain', $subdomain);
         update_site_option('rt_wufoo_gravity_api_key', $api_key);
     }
 
+    /**
+     * Get the Wufoo API credentials and populate the appropriate properties
+     */
     function set_options() {
         $this->subdomain = get_site_option('rt_wufoo_gravity_subdomain');
         $this->api_key = get_site_option('rt_wufoo_gravity_api_key');
     }
 
+    /**
+     * Process the API credentials submitted via the form
+     */
     function process_api_form() {
         if (isset($_POST['map_wuf_submit'])) {
             if (!empty($_POST['map_wuf_sub']) &&
@@ -69,8 +106,14 @@ class rtWufoo {
         }
     }
 
+    /**
+     *
+     * @return type
+     */
     function init() {
+        $this->progress = new rtProgress();
         $this->set_options();
+
         $this->wufoo = new WufooApiWrapper($this->subdomain, $this->api_key);
         try {
             $this->wforms = $this->wufoo->getForms();
@@ -88,6 +131,9 @@ class rtWufoo {
         }
     }
 
+    /**
+     *
+     */
     function api_form() {
         ?>
         <form action="" method="post" id="map_wuf_credentials">
@@ -134,6 +180,10 @@ class rtWufoo {
         <?php
     }
 
+    /**
+     *
+     * @return type
+     */
     function input_form_selector() {
         $form_select = '<select name="map_wuf_forms_list" id="map_wuf_forms_list">'
                 . '<option value="">Choose a form</option>';
@@ -145,6 +195,9 @@ class rtWufoo {
         return $form_select;
     }
 
+    /**
+     *
+     */
     function form_select_ui() {
         ?>
         <h3>Select a Wufoo Form</h3>
@@ -170,11 +223,19 @@ class rtWufoo {
         <?php
     }
 
+    /**
+     * Function to enqueue the necessary js and css
+     */
     function enqueue() {
         wp_enqueue_script('mapper-script', plugins_url('/js/mapper.js', __FILE__), array('jquery'));
         wp_enqueue_style('mapper-style', plugins_url('/css/mapper.css', __FILE__));
     }
 
+    /**
+     * Error handler
+     *
+     * @param type $err
+     */
     function error($err) {
         echo '<pre>';
         print_r($err);
