@@ -1,0 +1,15 @@
+<?php
+
+/*
+  Plugin Name: Wufoo to Gravity Importer
+  Plugin URI: http://rtcamp.com/
+  Description: Wuffo Form to Garvity Forms migrator!
+  Version: 1.0
+  Author: rtCamp
+  Author URI: http://rtcamp.com
+ */
+
+require_once('lib/WufooApiWrapper.php');
+require_once('rtWufoo.php');
+new rtWufoo();
+?>
