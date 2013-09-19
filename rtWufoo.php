@@ -66,7 +66,7 @@ class rtWufoo {
             } else {
                 $this->step = 'get_forms';
             }
-            $this->api_form();
+            $this->api_form_ui();
             $this->form_select_ui();
             ?>
         </div>
@@ -134,7 +134,7 @@ class rtWufoo {
     /**
      *
      */
-    function api_form() {
+    function api_form_ui() {
         ?>
         <form action="" method="post" id="map_wuf_credentials">
             <table class="form-table">
@@ -229,6 +229,19 @@ class rtWufoo {
     function enqueue() {
         wp_enqueue_script('mapper-script', plugins_url('/js/mapper.js', __FILE__), array('jquery'));
         wp_enqueue_style('mapper-style', plugins_url('/css/mapper.css', __FILE__));
+    }
+
+    /**
+     *
+     * @param array $instance An array with the name to be used for id and the progress percentage
+     * @return string The progress ui html
+     */
+    function progress_ui($instance = array()) {
+        $instance = wp_parse_args($instance, array('name' => 'general', 'progress' => 0));
+        $ui = '<div class="rt-wufoo-progress" id="' . $instance['name'] . '">'
+                . $this->progress->progress_ui($instance['progress'], false)
+                . '</div>';
+        return $ui;
     }
 
     /**
