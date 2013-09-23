@@ -316,12 +316,12 @@ class rtWufoo {
                     <form method="post" id="rt_wufoo_comment_import">
                         <input type="hidden" name="rt_wufoo_comment_index" class="rt_wufoo_comment_index" value="0" />
                         <input type="hidden" name="rt_wufoo_form" class="rt_wufoo_form" value="" />
-                        <input disabled="disabled" type="submit" class="rt_wufoo_comment_btn" name="rt_wufoo_import_comments" id="rt_wufoo_import_comments" value="Next: Import Comments" class="button"/>
+                        <input disabled="disabled" type="submit" class="rt_wufoo_comment_btn button" name="rt_wufoo_import_comments" id="rt_wufoo_import_comments" value="Next: Import Comments" />
                     </form>
                     <form method="post" id="rt_wufoo_map_users">
                         <input type="hidden" name="rt_wufoo_comment_index" class="rt_wufoo_comment_index" value="0" />
                         <input type="hidden" name="rt_wufoo_form" class="rt_wufoo_form" value="" />
-                        <input disabled="disabled" type="submit" class="rt_wufoo_comment_btn" name="rt_wufoo_skip_comments" id="rt_wufoo_skip_comments" value="Or: Skip Importing" class="button"/>
+                        <input disabled="disabled" type="submit" class="rt_wufoo_comment_btn button" name="rt_wufoo_skip_comments" id="rt_wufoo_skip_comments" value="Or: Skip Importing" />
                     </form>
                 </td>
             </tr>

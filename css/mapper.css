@@ -8,7 +8,7 @@
 #map_wuf_import_comments,
 #map_wuf_get_fields,
 #map_wuf_field_mapping_submit{ float: left; }
-.map_loading{ background: url("../images/loading.gif") no-repeat 0 0 transparent; display: none; float: left; height: 20px; margin-left: 5px; margin-top: 5px; width: 20px;}
+.rt_wufoo_loader{ background: url("../images/loading.gif") no-repeat 0 0 transparent; display: inline-block; float: right; height: 20px; margin-left: 5px; margin-top: 5px; width: 20px;}
 #map_date_format_selector{ display: inline; padding: 0 10px; }
 #map_date_format_selector input{ margin-right: 5px; }
 

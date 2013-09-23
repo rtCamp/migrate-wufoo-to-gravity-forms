@@ -75,8 +75,13 @@ function rt_wufoo_map_users_done(data){
 function rt_wufoo_alert($err){
     console.log($err);
 }
+
+function rt_wufoo_loader(formID){
+    jQuery('#'+formID).find("input[type='submit']").after('<div class="rt_wufoo_loader"></div>');
+    
+}
 jQuery(document).ready(function() {
-    console.log(rt_wufoo_obj);
+    
     
     //Any form that is submitted
     jQuery('form').on('submit',function(e){
@@ -97,16 +102,18 @@ jQuery(document).ready(function() {
             //add the necessary action to the data array/object for wp_ajax
             formData.push({ name: 'action', value : formID });
             
+            // add the loader
+            rt_wufoo_loader(formID);
+            
             //post the form
             jQuery.post( ajaxurl,formData)
                     .done(function( data ){
                         window[formID+'_done'](data);
+                        jQuery('.rt_wufoo_loader').remove();
                     })
                     .fail(function(){
                         window[formID+'_fail']();
-                    })
-                    .always(function(){
-                        rt_wufoo_loader();
+                        jQuery('.rt_wufoo_loader').remove();
                     });
         }
         
