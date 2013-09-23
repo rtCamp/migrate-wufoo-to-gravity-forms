@@ -230,7 +230,7 @@ function map_wufoo_admin_page() {
             }
             $wuf_sub = $_POST['map_wuf_sub'];
             $wuf_api_key = $_POST['map_wuf_key'];
-            $wuf = new WufooApiWrapper($wuf_api_key, $wuf_sub);
+            $wuf = new WufooApiWrapper($wuf_sub, $wuf_api_key);
             try {
                 $wuf_forms = $wuf->getForms();
             } catch (Exception $rt_importer_e) {

@@ -53,7 +53,85 @@ function fireCommentRequest(data) {
 function post_comment_import() {
 }
 
+function rt_wufoo_api_form_done(data){
+    data = jQuery.parseJSON(data);
+    rt_wufoo_obj.subdomain = data.subdomain;
+    rt_wufoo_obj.api_key = data.api_key;
+}
+
+function rt_wufoo_api_form_fail(){
+    rt_wufoo_alert('Please check the API settings');
+}
+
+function rt_wufoo_comment_import_done(data){
+    rt_wufoo_obj.comment_index = data;
+    jQuery('.rt_wufoo_comment_index').val(rt_wufoo_obj.comment_index);
+    
+}
+function rt_wufoo_map_users_done(data){
+    jQuery('#rt-wufoo-step-users').append(data);
+}
+
+function rt_wufoo_alert($err){
+    console.log($err);
+}
 jQuery(document).ready(function() {
+    console.log(rt_wufoo_obj);
+    
+    //Any form that is submitted
+    jQuery('form').on('submit',function(e){
+        
+        //assign id attribute to var
+        formID = jQuery(this).attr('id');
+        
+        //check if this is our form
+        if(formID.indexOf('rt_wufoo_') == 0){
+            
+            //only if it is our form, prevent submit
+            e.preventDefault();
+            
+            //get the form data
+            var formData = jQuery(this).serializeArray();
+            
+            
+            //add the necessary action to the data array/object for wp_ajax
+            formData.push({ name: 'action', value : formID });
+            
+            //post the form
+            jQuery.post( ajaxurl,formData)
+                    .done(function( data ){
+                        window[formID+'_done'](data);
+                    })
+                    .fail(function(){
+                        window[formID+'_fail']();
+                    })
+                    .always(function(){
+                        rt_wufoo_loader();
+                    });
+        }
+        
+    });
+    
+    
+    
+    jQuery('#rt_wufoo_form_selector').on('change', function(){
+        rt_wufoo_obj.form = jQuery(this).val();
+        if(rt_wufoo_obj.form!=''){
+            
+            formdata = {
+                action: 'rt_wufoo_comment_count',
+                form: rt_wufoo_obj.form
+            };
+            jQuery.get(ajaxurl,formdata)
+            .done(function(data){
+                rt_wufoo_obj.comment_count = data;
+                jQuery('.rt_wufoo_form').val(rt_wufoo_obj.form);
+                jQuery('.rt_wufoo_comment_btn').prop('disabled', false);
+            });
+        }
+        
+    });
+    
     jQuery('#map_mapping_form').submit(function() {
         jQuery(this).find('.map_loading').show();
         var data = jQuery(this).serializeArray();
@@ -77,10 +155,6 @@ jQuery(document).ready(function() {
         return false;
     });
 
-//    jQuery(".map_loading").ajaxStart(function(){
-//        jQuery(this).show();
-//    });
-    //Input field for other option
     jQuery('.map_form_fields').change(function() {
         if (jQuery(this).val() == 'other') {
             jQuery(this).parent().append('<input type="text" name="' + jQuery(this).attr('name') + '"/>');

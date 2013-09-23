@@ -10,6 +10,8 @@
  */
 
 require_once('lib/Wufoo-PHP-API-Wrapper/WufooApiWrapper.php');
+require_once('rtWufooAPI.php');
+require_once('rtProgress.php');
 require_once('rtWufoo.php');
 new rtWufoo();
 
