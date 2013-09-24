@@ -8,7 +8,8 @@
   Author: rtCamp
   Author URI: http://rtcamp.com
  */
-
+if (!defined('RT_WUFOO_IMPORT_PAGE_SIZE'))
+    define('RT_WUFOO_IMPORT_PAGE_SIZE', 25);
 require_once('lib/Wufoo-PHP-API-Wrapper/WufooApiWrapper.php');
 require_once('rtWufooAPI.php');
 require_once('rtProgress.php');
