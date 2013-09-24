@@ -16,16 +16,13 @@
 #map_wuf_field_mapping_table{ margin-bottom: 20px; }
 #map_wuf_field_mapping_form select,
 #map_mapping_form select { width: 65%; }
-#map_mapping_progress_bar{
-    display:none;
-}
-#progressbar {
+#rtprogressbar {
   background-color: #444;
   border-radius: 13px; 
   padding: 3px;
 }
 
-#progressbar div {
+#rtprogressbar div {
    background-color: #fb6003;
    width: 0; 
    height: 20px;

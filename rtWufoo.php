@@ -41,10 +41,14 @@ class rtWufoo {
                 'wp_ajax_rt_wufoo_api_form', array($this, 'process_api_form')
         );
         add_action(
-                'wp_ajax_rt_wufoo_comment_count', array($this, 'comment_count')
+                'wp_ajax_rt_wufoo_comment_count', array($this, 'comment_count_ajax')
         );
         add_action(
                 'wp_ajax_rt_wufoo_comment_import', array($this, 'comment_import')
+        );
+
+        add_action(
+                'wp_ajax_rt_wufoo_comment_progress_ui', array($this, 'comment_progress_ui')
         );
         add_action(
                 'wp_ajax_rt_wufoo_map_users', array($this, 'map_users')
@@ -62,21 +66,25 @@ class rtWufoo {
         add_action('admin_print_scripts-' . $hook, array($this, 'enqueue'));
     }
 
-    function comment_count() {
+    function comment_count_ajax() {
         if (isset($_GET['action']) && $_GET['action'] == 'rt_wufoo_comment_count') {
-            $wuf_form = $_GET['form'];
-            if (empty($wuf_form))
-                echo '-1';
-
-            $this->set_options();
-            $wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
-
-
-            $total_comment_cont_obj = $wufoo->getCommentCount($wuf_form);
-
-            echo $total_comment_cont_obj->Count;
-            die();
+        echo $this->comment_count();
+        die();
         }
+    }
+    
+    function comment_count(){
+        $wuf_form = $_GET['form'];
+        if (empty($wuf_form))
+            echo '-1';
+
+        $this->set_options();
+        $wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
+
+
+        $total_comment_cont_obj = $wufoo->getCommentCount($wuf_form);
+
+        return $total_comment_cont_obj->Count;
     }
 
     function comments_db_install() {
@@ -95,6 +103,13 @@ class rtWufoo {
         );";
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+    }
+
+    function imported_count() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . "_rt_w2g_comments";
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name};");
+        return $count;
     }
 
     function comment_import() {
@@ -138,105 +153,105 @@ class rtWufoo {
             <p class="textleft">Use the wizard below to import your Wufoo form submissions to a Gravity Form</p>
 
             <div class="hr-divider"></div>
+        <?php
+        $this->init();
+        if (empty($this->subdomain) && empty($this->api_key)) {
+            $this->step = 'get_api';
+        } else {
+            $this->step = 'get_forms';
+        }
+
+        echo '<div id = "rt_wufoo_wizard" >';
+
+        echo '<div class="steps" id="rt-wufoo-step-api">';
+        $this->api_form_ui();
+        echo '</div>';
+
+        echo '<div class="steps" id="rt-wufoo-step-form">';
+        $this->form_select_ui();
+        echo '</div>';
+
+        echo '<div class="steps" id="rt-wufoo-step-users">';
+        //$this->form_select_ui();
+        echo '</div>';
+
+        echo '</div>';
+        ?>
+        </div>
             <?php
-            $this->init();
-            if (empty($this->subdomain) && empty($this->api_key)) {
-                $this->step = 'get_api';
-            } else {
-                $this->step = 'get_forms';
+        }
+
+        /**
+         * Saves Wufoo API credentials in the options table
+         *
+         * @param string $subdomain Wufoo subdomain
+         * @param string $api_key Wufoo API key
+         */
+        function save_options($subdomain, $api_key) {
+            update_site_option('rt_wufoo_gravity_subdomain', $subdomain);
+            update_site_option('rt_wufoo_gravity_api_key', $api_key);
+        }
+
+        /**
+         * Get the Wufoo API credentials and populate the appropriate properties
+         */
+        function set_options() {
+            $this->subdomain = get_site_option('rt_wufoo_gravity_subdomain');
+            $this->api_key = get_site_option('rt_wufoo_gravity_api_key');
+        }
+
+        /**
+         * Process the API credentials submitted via the form
+         */
+        function process_api_form() {
+            if ($_POST['action'] != 'rt_wufoo_api_form')
+                echo '0';
+
+            if (!empty($_POST['map_wuf_sub']) &&
+                    !empty($_POST['map_wuf_key'])) {
+                $this->save_options(
+                        $_POST['map_wuf_sub'], $_POST['map_wuf_key']
+                );
+                echo json_encode(array(
+                    'subdomain' => $_POST['map_wuf_sub'],
+                    'api_key' => $_POST['map_wuf_key']
+                ));
             }
 
-            echo '<div id = "rt_wufoo_wizard" >';
+            die();
+        }
 
-            echo '<div class="steps" id="rt-wufoo-step-api">';
-            $this->api_form_ui();
-            echo '</div>';
+        /**
+         *
+         * @return type
+         */
+        function init() {
+            $this->progress = new rtProgress();
+            $this->set_options();
+            if (!$this->subdomain || !$this->api_key)
+                return;
+            $this->wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
+            try {
+                $this->wforms = $this->wufoo->getForms();
+            } catch (Exception $rt_importer_e) {
+                $this->error($rt_importer_e);
+            }
 
-            echo '<div class="steps" id="rt-wufoo-step-form">';
-            $this->form_select_ui();
-            echo '</div>';
+            if (!isset($this->wforms) || empty($this->wforms)) {
+                echo '<div class="error">'
+                . 'Please <a href="https://' . $this->subdomain . '.wufoo.com/build/">'
+                . 'create some forms on Wufoo!'
+                . '</a>'
+                . '</div>';
+                return;
+            }
+        }
 
-            echo '<div class="steps" id="rt-wufoo-step-users">';
-            //$this->form_select_ui();
-            echo '</div>';
-
-            echo '</div>';
+        /**
+         *
+         */
+        function api_form_ui() {
             ?>
-        </div>
-        <?php
-    }
-
-    /**
-     * Saves Wufoo API credentials in the options table
-     *
-     * @param string $subdomain Wufoo subdomain
-     * @param string $api_key Wufoo API key
-     */
-    function save_options($subdomain, $api_key) {
-        update_site_option('rt_wufoo_gravity_subdomain', $subdomain);
-        update_site_option('rt_wufoo_gravity_api_key', $api_key);
-    }
-
-    /**
-     * Get the Wufoo API credentials and populate the appropriate properties
-     */
-    function set_options() {
-        $this->subdomain = get_site_option('rt_wufoo_gravity_subdomain');
-        $this->api_key = get_site_option('rt_wufoo_gravity_api_key');
-    }
-
-    /**
-     * Process the API credentials submitted via the form
-     */
-    function process_api_form() {
-        if ($_POST['action'] != 'rt_wufoo_api_form')
-            echo '0';
-
-        if (!empty($_POST['map_wuf_sub']) &&
-                !empty($_POST['map_wuf_key'])) {
-            $this->save_options(
-                    $_POST['map_wuf_sub'], $_POST['map_wuf_key']
-            );
-            echo json_encode(array(
-                'subdomain' => $_POST['map_wuf_sub'],
-                'api_key' => $_POST['map_wuf_key']
-            ));
-        }
-
-        die();
-    }
-
-    /**
-     *
-     * @return type
-     */
-    function init() {
-        $this->progress = new rtProgress();
-        $this->set_options();
-        if (!$this->subdomain || !$this->api_key)
-            return;
-        $this->wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
-        try {
-            $this->wforms = $this->wufoo->getForms();
-        } catch (Exception $rt_importer_e) {
-            $this->error($rt_importer_e);
-        }
-
-        if (!isset($this->wforms) || empty($this->wforms)) {
-            echo '<div class="error">'
-            . 'Please <a href="https://' . $this->subdomain . '.wufoo.com/build/">'
-            . 'create some forms on Wufoo!'
-            . '</a>'
-            . '</div>';
-            return;
-        }
-    }
-
-    /**
-     *
-     */
-    function api_form_ui() {
-        ?>
         <h3>Setup API information</h3>
         <form action="" method="post" id="rt_wufoo_api_form">
             <table class="form-table">
@@ -308,7 +323,7 @@ class rtWufoo {
             <tr>
                 <th scope="row"><label for="map_wuf_forms_list">Select a Form:</label></th>
                 <td>
-                    <?php echo $this->input_form_selector(); ?>
+        <?php echo $this->input_form_selector(); ?>
                 </td>
             </tr>
             <tr>
@@ -329,6 +344,20 @@ class rtWufoo {
         <?php
     }
 
+    function comment_progress_ui() {
+        $progress = (int) $this->imported_count() / (int) $this->comment_count() * 100;
+        $instance = array(
+            'name' => 'comment-import',
+            'progress' => $progress
+        );
+        echo '<span id="rt_wufoo_imported_comments" class="rt_wufoo_completed">'.$this->imported_count().'</span>';
+        echo '<span class="rt_wufoo_progress_count_sep">/</span>';
+        echo '<span id="rt_wufoo_total_comments" class="rt_wufoo_total">'.$this->comment_count().'</span>';
+        echo ' comments';
+        echo $this->progress_ui($instance);
+        die();
+    }
+
     function map_users() {
         global $blog_id;
         $grav_users = get_users(
@@ -337,7 +366,7 @@ class rtWufoo {
         $wuf_form = $_POST['rt_wufoo_form'];
         $wuf_commentators = array();
         global $wpdb;
-        $table_name = $wpdb->prefix . "_rt_wufoo_2_gravity_comments_tmp";
+        $table_name = $wpdb->prefix . "_rt_w2g_comments";
         $wuf_commentators = $wpdb->get_results(
                 "
             SELECT DISTINCT commentedby
@@ -345,15 +374,17 @@ class rtWufoo {
             WHERE form= '{$wuf_form}'
             "
         );
-        $wuf_entry_count = $this->wufoo->getEntryCount($wuf_form);
-        $wuf_form_fields = $this->wufoo->getFields($wuf_form);
+            $this->set_options();
+            $wufoo = new rtWufooAPI($this->api_key,$this->subdomain);
+        $wuf_entry_count = $wufoo->getEntryCount($wuf_form);
+        $wuf_form_fields = $wufoo->getFields($wuf_form);
 
         $wuf_page_size = 25;
         $wuf_times = ceil(floatval($wuf_entry_count) / 25);
         $wuf_form_entries = array();
         for ($i = 0; $i < $wuf_times; $i++) {
             $wuf_form_entries = array_merge(
-                    $wuf_form_entries, $this->wufoo->getEntries($wuf_form, 'forms', 'pageStart=' . ($i * $wuf_page_size) . '&pageSize=' . $wuf_page_size));
+                    $wuf_form_entries, $wufoo->getEntries($wuf_form, 'forms', 'pageStart=' . ($i * $wuf_page_size) . '&pageSize=' . $wuf_page_size));
         }
         $gforms = $this->get_gravity_forms();
         if (isset($gforms) && !empty($gforms)) {
@@ -425,9 +456,10 @@ class rtWufoo {
      * @return string The progress ui html
      */
     function progress_ui($instance = array()) {
+        $progress = new rtProgress();
         $instance = wp_parse_args($instance, array('name' => 'general', 'progress' => 0));
         $ui = '<div class="rt-wufoo-progress" id="' . $instance['name'] . '">'
-                . $this->progress->progress_ui($instance['progress'], false)
+                . $progress->progress_ui($instance['progress'], false)
                 . '</div>';
         return $ui;
     }
@@ -452,7 +484,8 @@ class rtWufoo {
                 $return[$form->id] = $form->title;
             }
             return $return;
-        } else
+        }
+        else
             return false;
     }
 

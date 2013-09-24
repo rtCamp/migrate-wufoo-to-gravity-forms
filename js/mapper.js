@@ -129,11 +129,22 @@ jQuery(document).ready(function() {
                 action: 'rt_wufoo_comment_count',
                 form: rt_wufoo_obj.form
             };
+            jQuery(this).after('<div class="rt_wufoo_loader"></div>');
             jQuery.get(ajaxurl,formdata)
             .done(function(data){
                 rt_wufoo_obj.comment_count = data;
                 jQuery('.rt_wufoo_form').val(rt_wufoo_obj.form);
-                jQuery('.rt_wufoo_comment_btn').prop('disabled', false);
+                progressdata = {
+                    action:'rt_wufoo_comment_progress_ui',
+                    form: rt_wufoo_obj.form
+                };
+                
+                jQuery.get(ajaxurl,progressdata)
+                        .done(function(newdata){
+                    jQuery('#rt_wufoo_map_users').after(newdata);
+                    jQuery('.rt_wufoo_comment_btn').prop('disabled', false);
+                    jQuery('.rt_wufoo_loader').remove();
+                });
             });
         }
         
