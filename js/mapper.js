@@ -1,37 +1,113 @@
-/* 
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+/*  UTILITY FUNCTIONS   */
+
+/**
+ * Blinks the supplied element once.
+ * Used for error message blinking
+ * 
+ * @param {object} el JQuery element
+ * @returns {undefined} nothing
  */
-
-function fireFieldRequest(data) {
-    var obj = jQuery('#map_wuf_field_mapping_form');
-    var total = jQuery('#map_wuf_entry_total').val();
-    return jQuery.post(ajaxurl, data, function(response) {
-        if (response != 0) {
-            var progw = Math.ceil((parseInt(response) / parseInt(total)) * 100);
-            obj.find('.map_loading').hide();
-            jQuery('#map_progress_msgs').html('<div class="map_mapping_success"> Processed ' + response + ' of ' + total + '.</div>');
-            jQuery('#progressbar>div').css('width', progw + '%');
-        } else {
-            jQuery('#map_progress_msgs').html('<div class="map_mapping_failure">Row ' + response + ' failed.</div>');
-        }
-
+function rtWufooBlink(el){
+    jQuery(el).fadeOut('slow', function(){
+        jQuery(this).fadeIn('slow');
     });
 }
 
-function fireCommentRequest(data) {
+/**
+ * Creates the alert from given text
+ * 
+ * @param {string} $err The error message string
+ * @returns {undefined} Northing
+ */
+function rtWufooAlert($err){
+    $container = jQuery('#rt_wufoo_error');
+    $close = '&nbsp;[<a href="#" class="rt_wufoo_err_close">close</a>]';
+    $msgcontainer =  jQuery('<div id="rt_wufoo_error_msg"></div>');
+    $msgcontainer.html($err);
+    $msgcontainer.append($close);
+    $container.append($msgcontainer);
+    rtWufooBlink($msgcontainer);
+}
 
-    var total = jQuery('.rt_wufoo_comment_count').val();
+/**
+ * Creates the spinner for ajax requests between steps
+ * 
+ * @param {string} formID The id of the form, the loader is for
+ * @returns {undefined} nothing
+ */
+function rtWufooLoader(formID){
+    jQuery('#'+formID)
+            .closest('.rt_wufoo_stepbox')
+            .after('<div class="rt_wufoo_loader"></div>');
+    
+}
+
+/**
+ * Scrolls to the given element. Useful for moving between steps
+ * 
+ * @param {object} el the jQuery element to scroll to 
+ * @returns {undefined}
+ */
+
+function rtWufooScroll(el){
+    jQuery(window).scrollTop(el.position().top);
+}
+
+/*  AJAX PIPES          */
+
+/**
+ * 
+ * @param {type} data
+ * @returns {unresolved}
+ */
+function fireEntryRequest(data) {
+   
+    var total = jQuery('#rt_wufoo_entry_total').val();
+    var data = jQuery('#rt_wufoo_entries_import').serializeArray();
+    data.push({ name: 'action', value : 'rt_wufoo_import_entries' });
+    
     return jQuery.post(ajaxurl, data, function(response) {
         if (response != 0) {
             var progw = Math.ceil((parseInt(response) / parseInt(total)) * 100);
             jQuery('#rtprogressbar>div').css('width', progw + '%');
-            jQuery('.rt_wufoo_comment_index').val(response);
+            jQuery('#rt_wufoo_entry_index').val(response);
+            jQuery('#rt_wufoo_imported_entries').html(response);
         } else {
-            rt_wufoo_alert('Row ' + response + ' failed');
+            rtWufooAlert('Row ' + response + ' failed');
+            jQuery('.rt_wufoo_loader').remove();
         }
         if (response == total) {
-            jQuery.get(ajaxurl,{action: 'rt_wufoo_comment_next', form: rt_wufoo_obj.form},function(hresponse){
+            jQuery('#rt-wufoo-step-import').after('<div id="rt_wufoo_completed" class="rt_wufoo_steps"><div class="rt_wufoo_stepbox"><h3>Done!</h3></div></div>');
+            rtWufooScroll(jQuery('#rt_wufoo_completed'));
+        }
+
+    });
+}
+/**
+ * Pipe function for comment import
+ * 
+ * @param {type} data The form data for processing
+ * @returns {unresolved} the promise for the next iteration in the pipe
+ */
+function fireCommentRequest() {
+
+    var total = jQuery('#rt_wufoo_comment_count').val();
+    var data = jQuery('#rt_wufoo_comment_import').serializeArray();
+    data.push({ name: 'action', value : 'rt_wufoo_comment_import' });
+    
+    return jQuery.post(ajaxurl, data, function(response) {
+        if (response != 0) {
+            var progw = Math.ceil((parseInt(response) / parseInt(total)) * 100);
+            jQuery('#rtprogressbar>div').css('width', progw + '%');
+            jQuery('#rt_wufoo_comment_index').val(response);
+            jQuery('#rt_wufoo_imported_comments').html(response);
+        } else {
+            rtWufooAlert('Row ' + response + ' failed');
+            jQuery('.rt_wufoo_loader').remove();
+        }
+        if (response == total) {
+            rtWufooLoader(jQuery('#rtprogressbar>div').closest('form').attr('id'));
+            jQuery.get(ajaxurl,{action: 'rt_wufoo_comment_next', form: rt_wufoo_obj.form}).done(function(hresponse){
                 jQuery('tr#rt_wufoo_comment_next').replaceWith(hresponse);
                     jQuery('.rt_wufoo_form').val(rt_wufoo_obj.form);
                     jQuery('.rt_wufoo_loader').remove();
@@ -41,13 +117,58 @@ function fireCommentRequest(data) {
 
     });
 }
-function post_comment_import() {
+
+/*  AJAX MANIPULATORS   */
+
+function rtWufooImportAjax($type){
+    total = jQuery('#rt_wufoo_'+$type+'_total').val();
+    done = jQuery('#rt_wufoo_'+$type+'_index').val();
+    remaining = total - done;
+    var countreq = Math.ceil((remaining / rt_wufoo_obj.count));
+    var newstartingpoint = jQuery.Deferred();
+    newstartingpoint.resolve();
+    for (var i = 0; i < parseInt(countreq); i++) {
+        newstartingpoint = newstartingpoint.pipe(function() {
+            if($type=='entry'){
+                return fireEntryRequest();
+            }else if($type=='comment'){
+                return fireCommentRequest();
+            }
+        });
+    }
+    return true;
+}
+/**
+ * Called before the default ajax request is fired. Useful for overriding the default request
+ * Useful for import progress trigerring instead of loading the next step
+ * 
+ * @param {string} form the form this request is for
+ * @param {object} data the form input array
+ * @returns {Boolean} whether the default request should be prevented
+ */
+function rtWufooPreAjax(form,data){
+    switch(form){
+        case 'rt_wufoo_entries_import':
+            return rtWufooImportAjax('entry');
+            break;
+        case 'rt_wufoo_comment_import':
+            
+            return rtWufooImportAjax('comment');
+            break;
+        default:
+            return false;
+    }
+    
 }
 
+/**
+ * 
+ * @param {type} form
+ * @param {type} data
+ * @returns {rtWufooDone}
+ */
 function rtWufooDone(form, data){
-    switch(form){
-        
-        case 'rt_wufoo_api_form':
+   if(form=='rt_wufoo_api_form'){
             
             data = jQuery.parseJSON(data);
             rt_wufoo_obj.subdomain = data.subdomain;
@@ -60,49 +181,18 @@ function rtWufooDone(form, data){
                         jQuery('#rt-wufoo-step-form').html(newdata);
                     }
                 );
-            break;
-            
-        case 'rt_wufoo_comment_count_ajax':
-            jQuery('.rt_wufoo_comment_count').val(data);
-            var countreq = Math.ceil((data / 25));
-            var form_data = jQuery('#'+form).serializeArray();
-            chain_data = {};
-            for (var i = 0; i < parseInt(countreq); i++) {
-                
-                var act_data = form_data;
-                act_data.push({
-                    name:'action',
-                    value: 'rt_wufoo_comment_import',
-                });
-                chain_data[i] = act_data;
-            }
-
-            var newstartingpoint = jQuery.Deferred();
-            newstartingpoint.resolve();
-            jQuery.each(chain_data, function(i, v) {
-                newstartingpoint = newstartingpoint.pipe(function() {
-                    return fireCommentRequest(v);
-                });
-            });
-            break;
-            
-        case 'rt_wufoo_map_users':
-            
-            jQuery('#rt-wufoo-step-users').html(data);
-            break;
-        case 'rt_wufoo_form_fields_map':
-            jQuery('#rt-wufoo-step-fields').html(data);
-            break;
-        case 'rt_wufoo_field_mapping_form':
-             jQuery('#rt-wufoo-step-import').html(data);
-             break;
-        default:
-            break;
-        
-    }
+   }else{
+       jQuery('#'+form).closest('.rt_wufoo_steps').next().html(data);
+   }
     
 }
 
+/**
+ * 
+ * @param {type} form
+ * @param {type} data
+ * @returns {undefined}
+ */
 function rtWufooFail(form, data){
     switch(form){
         case 'rt_wufoo_api_form':
@@ -118,14 +208,6 @@ function rtWufooFail(form, data){
 }
 
 
-function rt_wufoo_alert($err){
-    console.log($err);
-}
-
-function rt_wufoo_loader(formID){
-    jQuery('#'+formID).closest('.rt_wufoo_stepbox').after('<div class="rt_wufoo_loader"></div>');
-    
-}
 jQuery(document).ready(function() {
     
     
@@ -136,10 +218,12 @@ jQuery(document).ready(function() {
         formID = jQuery(this).attr('id');
         
         //check if this is our form
-        if(formID.indexOf('rt_wufoo_') == 0){
+        if(formID.indexOf('rt_wufoo_')==0){
+            
             
             //only if it is our form, prevent submit
             e.preventDefault();
+            
             
             //get the form data
             var formData = jQuery(this).serializeArray();
@@ -148,19 +232,28 @@ jQuery(document).ready(function() {
             //add the necessary action to the data array/object for wp_ajax
             formData.push({ name: 'action', value : formID });
             
-            // add the loader
-            rt_wufoo_loader(formID);
+            
+            // here's the chance for the script to decide if it wants to interfere and take over
+            rt_wufoo_interference = rtWufooPreAjax(formID, formData);
+            
+            // if there's no interference, continue
+            if(!rt_wufoo_interference){
+                
+                // add the loader
+                rtWufooLoader(formID);
             
             //post the form
-            jQuery.post( ajaxurl,formData)
-                    .done(function( data ){
-                        rtWufooDone(formID,data);
-                        jQuery('.rt_wufoo_loader').remove();
-                    })
-                    .fail(function(){
-                        rtWufooFail(formID);
-                        jQuery('.rt_wufoo_loader').remove();
-                    });
+                jQuery.post( ajaxurl,formData)
+                        .done(function( data ){
+                            rtWufooDone(formID,data);
+                            rtWufooScroll(jQuery('#'+formID).closest('.rt_wufoo_steps').next());
+                            jQuery('.rt_wufoo_loader').remove();
+                        })
+                        .fail(function(){
+                            rtWufooFail(formID);
+                            jQuery('.rt_wufoo_loader').remove();
+                        });
+            }
         }
         
     });
@@ -197,138 +290,6 @@ jQuery(document).ready(function() {
         
     });
     
-    jQuery('#map_mapping_form').submit(function() {
-        jQuery(this).find('.map_loading').show();
-        var data = jQuery(this).serializeArray();
-        var count = jQuery('#map_row_count').val();
-        for (var i = 0; i < count; i++) {
-            var ajaxdata = {
-                action: 'map_import',
-                map_data: data,
-                map_filename: jQuery('#map_filename').val(),
-                map_form_id: jQuery('#map_form_id').val(),
-                map_row_index: i
-            }
-            jQuery.post(ajaxurl, ajaxdata, function(response) {
-                if (response != 0) {
-                    jQuery('#map_mapping_progress').append('<tr><td><div class="map_mapping_success">Row ' + response + ' inserted.</td></tr>');
-                } else {
-                    jQuery('#map_mapping_progress').append('<tr><td><div class="map_mapping_failure">Row ' + response + ' failed.</td></tr>');
-                }
-            });
-        }
-        return false;
-    });
-
-    jQuery('.map_form_fields').change(function() {
-        if (jQuery(this).val() == 'other') {
-            jQuery(this).parent().append('<input type="text" name="' + jQuery(this).attr('name') + '"/>');
-            jQuery(this).removeAttr('name')
-        } else {
-            var attr = jQuery(this).parent().children('input').attr('name');
-            jQuery(this).attr('name', attr);
-            jQuery(this).parent().children('input').remove();
-        }
-    });
-
-    jQuery('.map_wuf_gform_fields').live('change', function() {
-        if (jQuery(this).val() == 'other') {
-            jQuery(this).parent().append('<input type="text" name="' + jQuery(this).attr('name') + '"/>');
-            jQuery(this).removeAttr('name')
-        } else {
-            var attr = jQuery(this).parent().children('input').attr('name');
-            jQuery(this).attr('name', attr);
-            jQuery(this).parent().children('input').remove();
-        }
-    });
-
-//Disable same option from multiple selects
-//    jQuery('.map_form_fields').change(function(){
-//        var val = jQuery(this).val();
-//        jQuery('.map_form_fields').not(jQuery(this)).each(function(){
-//            jQuery(this).find('option[value="'+val+'"]').attr('disabled', 'disabled');
-//        });
-//    });
-    jQuery('#map_wuf_skip_comments').click(function() {
-        var obj = jQuery('#map_wuf_forms_list_form');
-        jQuery('#map_mapping_progress_bar').hide();
-        obj.find('.map_loading').show();
-        var commentatordata = {
-            action: 'map_wuf_map_commentators',
-            map_wuf_key: jQuery('#map_wuf_key').val(),
-            map_wuf_sub: jQuery('#map_wuf_sub').val(),
-            map_wuf_form: jQuery('#map_wuf_forms_list').val()
-        }
-        jQuery.post(ajaxurl, commentatordata, function(response) {
-            obj.find('.map_loading').hide();
-            obj.after(response);
-        });
-
-    });
-    jQuery('#map_wuf_forms_list_form').submit(function() {
-        var obj = jQuery(this);
-        obj.find('#map_wuf_forms_list_error').remove();
-        if (obj.find('#map_wuf_forms_list').val() == '') {
-            jQuery('#map_wuf_forms_list_table').prepend('<tr id="map_wuf_forms_list_error"><td colspan="2"><div class="error">Please select a Wufoo Form!</div></td></tr>');
-        } else {
-            obj.find('.map_loading').show();
-            var form_data = jQuery(this).serializeArray();
-            var ajaxdata = {
-                action: 'map_wuf_form_select',
-                map_wuf_form_data: form_data
-            };
-            jQuery.post(ajaxurl, ajaxdata, function(response) {
-                obj.find('.map_loading').hide();
-                jQuery('input#map_wuf_comment_count').val(response);
-                commentcountstr = response + ' comments found';
-                obj.after(commentcountstr);
-                var countreq = Math.ceil((response / 25));
-                var data = {};
-                for (var i = 0; i < parseInt(countreq); i++) {
-                    var ajaxdata = {
-                        action: 'map_wuf_form_comment_import',
-                        map_wuf_form_data: form_data,
-                        map_wuf_request_index: i
-                    };
-                    data[i] = ajaxdata;
-                }
-
-                var newstartingpoint = jQuery.Deferred();
-                newstartingpoint.resolve();
-                jQuery('#map_mapping_progress_bar').show();
-                jQuery.each(data, function(i, v) {
-                    jQuery('#map_progress_msgs').html('<div class="map_mapping_process">Process started. Please wait.</div>');
-                    newstartingpoint = newstartingpoint.pipe(function() {
-                        return fireCommentRequest(v);
-                    });
-                });
-
-            });
-        }
-        return false;
-    });
-
-    jQuery('#map_wuf_comment_mapping_form').live('submit', function() {
-        var obj = jQuery(this);
-        obj.find('#map_wuf_forms_list_error').remove();
-        if (obj.find('#map_wuf_gforms_list').val() == '') {
-            jQuery('#map_wuf_gforms_list_table').prepend('<tr id="map_wuf_forms_list_error"><td colspan="2"><div class="error">Please select a Gravity Form!</div></td></tr>');
-        } else {
-            obj.find('.map_loading').show();
-            var form_data = jQuery(this).serializeArray();
-            var ajaxdata = {
-                action: 'map_wuf_form_fields',
-                map_wuf_form_data: form_data,
-                map_wuf_key: jQuery('#map_wuf_key').val(),
-                map_wuf_sub: jQuery('#map_wuf_sub').val()
-            };
-            jQuery.post(ajaxurl, ajaxdata, function(response) {
-                obj.find('.map_loading').hide();
-                obj.after(response);
-            });
-        }
-        return false;
-    });
 
     jQuery('#map_wuf_field_mapping_form').live('submit', function() {
         var obj = jQuery(this);

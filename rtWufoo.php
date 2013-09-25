@@ -62,6 +62,9 @@ class rtWufoo {
         add_action(
                 'wp_ajax_rt_wufoo_field_mapping_form', array($this, 'entries_import_ui')
         );
+        add_action(
+                'wp_ajax_rt_wufoo_import_entries', array($this, 'entries_import')
+        );
     }
 
     /**
@@ -142,14 +145,13 @@ class rtWufoo {
      */
     function comment_import() {
         $form = $_POST['form'];
-        $comment_index = $_POST['comment_index'];
+        $page_start = $_POST['comment_index'];
         $page_size = RT_WUFOO_IMPORT_PAGE_SIZE;
-        $page_size = ($page_size > $this->comment_count()) ? $this->comment_count() : $page_size;
         $this->init();
         $this->comments_db_install();
 
         try {
-            $comments = $this->wufoo->getPagedComments($form, $page_size, $comment_index);
+            $comments = $this->wufoo->getPagedComments($form, $page_size, $page_start);
         } catch (Exception $rt_importer_e) {
             $this->error($rt_importer_e);
         }
@@ -172,7 +174,7 @@ class rtWufoo {
                 );
             }
         }
-        echo count($comments) + ($comment_index);
+        echo count($comments) + ($page_start);
         die();
     }
 
@@ -190,7 +192,8 @@ class rtWufoo {
             $this->init();
 
 
-            echo '<div id = "rt_wufoo_wizard" >';
+            echo '<div id="rt_wufoo_wizard" >';
+            echo '<div id="rt_wufoo_error"></div>';
 
             echo '<div class="rt_wufoo_steps" id="rt-wufoo-step-api">';
             $this->api_form_ui();
@@ -395,9 +398,9 @@ class rtWufoo {
                 if ($remaining > 0) {
                     $this->comment_progress_ui();
                     ?>
-                    <form method="post" id="rt_wufoo_comment_count_ajax">
-                        <input type="hidden" name="comment_index" class="rt_wufoo_comment_index" value="<?php echo $this->imported_count(); ?>" />
-                        <input type="hidden" name="comment_count" class="rt_wufoo_comment_count" value="<?php echo $this->comment_count(); ?>" />
+                    <form method="post" id="rt_wufoo_comment_import">
+                        <input type="hidden" name="comment_index" id="rt_wufoo_comment_index" value="<?php echo $this->imported_count(); ?>" />
+                        <input type="hidden" name="comment_count" id="rt_wufoo_comment_total" value="<?php echo $this->comment_count(); ?>" />
                         <input type="hidden" name="form" class="rt_wufoo_form" value="" />
                         <input type="submit" class="rt_wufoo_comment_btn button" name="rt_wufoo_import_comments" id="rt_wufoo_import_comments" value="Import Comments" />
                     </form>
@@ -495,16 +498,8 @@ class rtWufoo {
         $wuf_form = $_POST['form'];
         $this->set_options();
         $wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
-        $wuf_entry_count = $wufoo->getEntryCount($wuf_form);
         $wuf_form_fields = $wufoo->getFields($wuf_form);
 
-
-        $wuf_times = ceil(floatval($wuf_entry_count) / RT_WUFOO_IMPORT_PAGE_SIZE);
-//        $wuf_form_entries = array();
-//        for ($i = 0; $i < $wuf_times; $i++) {
-//            $wuf_form_entries = array_merge(
-//                    $wuf_form_entries, $wufoo->getEntries($wuf_form, 'forms', 'pageStart=' . ($i * RT_WUFOO_IMPORT_PAGE_SIZE) . '&pageSize=' . RT_WUFOO_IMPORT_PAGE_SIZE));
-//        }
         $gforms = $this->get_gravity_forms();
         if (isset($gforms) && !empty($gforms)) {
             $form_select = '<select name="gform" id="map_wuf_gforms_list">';
@@ -525,8 +520,6 @@ class rtWufoo {
         $return .= '<tr><th scope="row">Select a Gravity Form</th><td>' . $form_select . '</td></tr>';
         $return .= '</table>';
         $return .= '<input type="hidden" name="form" value="' . $wuf_form . '" id="map_wuf_form_hash"/>';
-        $return .= '<input type="hidden" name="entry_times" id="map_wuf_entry_count" value="' . $wuf_times . '"/>';
-        $return .= '<input type="hidden" name="entry_count" id="map_wuf_entry_total" value="' . $wuf_entry_count . '"/>';
 
         return $return;
     }
@@ -542,7 +535,6 @@ class rtWufoo {
         $gform = $_REQUEST['gform'];
         $wusers = $_REQUEST['users'];
 
-        $entry_times = $_REQUEST['entry_times'];
         $entry_count = $_REQUEST['entry_count'];
 
         update_site_option('rt_wufoo_' . $wform . '_user_map', maybe_serialize($wusers));
@@ -551,7 +543,6 @@ class rtWufoo {
 
         $gform_data = RGFormsModel::get_form_meta($gform);
         $fields = maybe_unserialize(get_site_option('rt_wufoo_' . $wform . '_fields'));
-//$entries = $wuf->getEntries($wuf_form, 'forms', 'pageStart=0&pageSize=20');
 
         $return = '<h3>Sync Form fields:</h3>';
         $return .='<form action="" method="post" id="rt_wufoo_field_mapping_form">';
@@ -578,8 +569,6 @@ class rtWufoo {
         $return .= '</table>';
         $return .= '<input type="hidden" name="form" value="' . $wform . '" id="map_wuf_form_hash"/>';
         $return .= '<input type="hidden" name="gform" id="map_wuf_gform" value="' . $gform . '"/>';
-        $return .= '<input type="hidden" name="entry_times" id="map_wuf_entry_count" value="' . $entry_times . '"/>';
-        $return .= '<input type="hidden" name="entry_count" id="map_wuf_entry_total" value="' . $entry_count . '"/>';
         $return .= '<input type="submit" name="map_wuf_field_mapping_submit" id="map_wuf_field_mapping_submit" value="Next: Save & Import Form Data" class="button" />';
         $return .= '</form>';
         echo '<div class="rt_wufoo_stepbox">' . $return . '</div>';
@@ -591,28 +580,43 @@ class rtWufoo {
      */
     function entries_import_ui() {
 
-        echo '<div class="rt_wufoo_stepbox">';
-        echo '<h3>Import form data</h3>';
+        $return = '<div class="rt_wufoo_stepbox">';
+        $return .= '<h3>Import form data</h3>';
 
         $wform = $_REQUEST['form'];
         $gform = $_REQUEST['gform'];
         $field_map = $_REQUEST['gform_fields'];
         update_site_option('rt_wufoo_' . $wform . '_field_map', maybe_serialize($field_map));
 
-        $entry_times = $_REQUEST['entry_times'];
-        $entry_count = $_REQUEST['entry_count'];
-        $progress = 0 / (int) $entry_count * 100;
+        $this->init();
+        try {
+            $entry_count = $this->wufoo->getEntryCount($wform);
+        } catch (Exception $rt_importer_e) {
+            $this->error($rt_importer_e);
+        }
+
+
+        $saved_entry_index = get_site_option('rt_wufoo_' . $wform . '_entry_complete_count');
+        $entry_index = $saved_entry_index ? $saved_entry_index : 0;
+        $progress = (int) $entry_index / (int) $entry_count * 100;
         $instance = array(
-            'name' => 'comment-import',
+            'name' => 'entry-import',
             'progress' => $progress
         );
-        echo '<span id="rt_wufoo_imported_entries" class="rt_wufoo_completed">0</span>';
-        echo '<span class="rt_wufoo_progress_count_sep">/</span>';
-        echo '<span id="rt_wufoo_total_entries" class="rt_wufoo_total">' . $entry_count . '</span>';
-        echo ' entries';
-        echo $this->progress_ui($instance);
-        $this->entries_import();
-        echo '</div>';
+        $return .= '<span id="rt_wufoo_imported_entries" class="rt_wufoo_completed">' . $entry_index . '</span>';
+        $return .= '<span class="rt_wufoo_progress_count_sep">/</span>';
+        $return .= '<span id="rt_wufoo_total_entries" class="rt_wufoo_total">' . $entry_count . '</span>';
+        $return .= ' entries';
+        $return .= $this->progress_ui($instance);
+        $return .= '<form id="rt_wufoo_entries_import">';
+        $return .= '<input type="hidden" name="form" value="' . $wform . '" id="map_wuf_form_hash"/>';
+        $return .= '<input type="hidden" name="gform" id="map_wuf_gform" value="' . $gform . '"/>';
+        $return .= '<input type="hidden" name="entry_index" id="rt_wufoo_entry_index" value="' . $entry_index . '"/>';
+        $return .= '<input type="hidden" name="entry_count" id="rt_wufoo_entry_total" value="' . $entry_count . '"/>';
+        $return .= '<input type="submit" name="rt_wufoo_start_import" id="rt_wufoo_start_import" value="Start Import" class="button" />';
+        $return .= '</form>';
+        $return .= '</div>';
+        echo $return;
         die();
     }
 
@@ -623,6 +627,9 @@ class rtWufoo {
     function entries_import() {
         $wform = $_REQUEST['form'];
         $gform = $_REQUEST['gform'];
+        $entry_index = $_REQUEST['entry_index'];
+        $entry_count = $_REQUEST['entry_count'];
+
         $this->init();
 
 
@@ -632,24 +639,25 @@ class rtWufoo {
         $c = new GFCommon();
         $gform_meta = RGFormsModel::get_form_meta($gform);
 
-        global $wpdb;
-        $prefix = $wpdb->prefix;
+        try {
+            $entries = $this->wufoo->getEntries($wform, 'forms', 'pageStart=' . $entry_index . '&pageSize=' . RT_WUFOO_IMPORT_PAGE_SIZE);
+        } catch (Exception $rt_importer_e) {
+            $this->error($rt_importer_e);
+        }
 
 
-        $entries = $this->wufoo->getEntries($wform, 'forms', 'pageStart=' . $pageStart . '&pageSize=' . $pageSize);
-
-        $op = array();
+        $this->op = array();
 
         foreach ($entries as $index => $entry) {
 
-            foreach ($field_map as $g_id->$w_id) {
+            foreach ($field_map as $g_id => $w_id) {
                 if (isset($w_id) && $w_id != '') {
-                    $op[$g_id] = '';
+                    $this->op[$g_id] = '';
                     $field_meta = RGFormsModel::get_field($gform_meta, $g_id);
                     if ($field_meta['type'] == 'fileupload') {
-                        $op[$g_id] = $this->import_file_upload($entry, $w_id);
+                        $this->op[$g_id] = $this->import_file_upload($entry, $w_id);
                     } else {
-                        $op = $this->import_regular_field($entry, $w_id, $field_meta);
+                        $this->import_regular_field($wform, $entry, $g_id, $w_id, $field_meta);
                     }
                 }
             }
@@ -660,23 +668,24 @@ class rtWufoo {
             $lead_table = $f->get_lead_table_name();
 
 
-            $lead_id = $this->insert_lead($entry, $lead_table, $ip, $currency, $page);
+            $lead_id = $this->insert_lead($entry, $lead_table, $ip, $currency, $page, $wform, $gform);
 
             if ($lead_id) {
-                foreach ($op as $inputid => $value) {
+                foreach ($this->op as $inputid => $value) {
                     $this->insert_fields($lead_id, $gform, $inputid, $value);
                 }
 
 //Insert comments as notes for the corresponding user map
-                $comments = $this->get_comments_by_entry($form, $entry->EntryId);
+                $comments = $this->get_comments_by_entry($wform, $entry->EntryId);
                 if (isset($comments) && !empty($comments)) {
                     foreach ($comments as $comment) {
-                        $this->move_comments_for_entry($comment, $f->get_lead_notes_table_name(), $lead_id);
+                        $this->move_comments_for_entry($comment, $f->get_lead_notes_table_name(), $lead_id, $wform);
                     }
                 }
             }
         }
-        echo $wuf_entry_index * RT_WUFOO_IMPORT_PAGE_SIZE + $chunk_count;
+        //update_site_option('rt_wufoo_' . $wform . '_entry_complete_count','0');
+        echo count($entries) + $entry_index;
         die();
     }
 
@@ -737,28 +746,46 @@ class rtWufoo {
      * @param type $field_meta
      * @return type
      */
-    function import_regular_field($entry, $w_id, $field_meta) {
+    function import_regular_field($wform, $entry, $g_id, $w_id, $field_meta) {
         if (property_exists($entry, $w_id)) {
 
             $fields = maybe_unserialize(get_site_option('rt_wufoo_' . $wform . '_fields'));
-            $op[$g_id] = $w_id;
+            $this->op[$g_id] = $w_id;
 
             if (property_exists($fields->Fields[$w_id], 'SubFields') && is_array($fields->Fields[$w_id]->SubFields)) {
                 if (is_array($field_meta['inputs'])) {
                     $field_keys = array_keys($fields->Fields[$w_id]->SubFields);
-                    $op = array_merge($op, $this->import_multipart_field($field_keys, $w_id));
+                    $this->import_multipart_field($field_keys, $w_id, $field_meta, $entry);
                 } else {
                     $wuf_value = '';
                     foreach ($fields->Fields[$w_id]->SubFields as $key => $value) {
                         $wuf_value .= $entry->$key;
                         $wuf_value .= ' ';
                     }
-                    $op[$g_id] = $wuf_value;
+                    $this->op[$g_id] = $wuf_value;
                 }
             } else {
-                $op[$g_id] = $entry->$w_id;
+                if (is_array($field_meta['inputs'])) {
+                    $field_keys = explode(' ', $entry->$w_id);
+                    $this->import_single_to_multipart_field($field_keys, $w_id, $field_meta, $entry);
+                } else {
+                    $this->op[$g_id] = $entry->$w_id;
+                }
             }
-            return $op;
+        }
+    }
+
+    function import_single_to_multipart_field($field_keys, $w_id, $field_meta, $entry) {
+        $diff = count($field_meta['inputs']) - count($field_keys);
+
+        if ($diff > 0) {
+            for ($i = 0; $i < $diff; $i++) {
+                $field_keys[] = ' ';
+            }
+        }
+
+        foreach ($field_keys as $i => $field_key) {
+            $this->op[strval($field_meta['inputs'][$i]['id'])] = $field_key;
         }
     }
 
@@ -768,25 +795,23 @@ class rtWufoo {
      * @param type $w_id
      * @return type
      */
-    function import_multipart_field($field_keys, $w_id) {
+    function import_multipart_field($field_keys, $w_id, $field_meta, $entry) {
 
         if (count($field_keys) == count($field_meta['inputs'])) {
             foreach ($field_keys as $i => $field_key) {
-                $op[strval($field_meta['inputs'][$i]['id'])] = $entry->$field_key;
+                $this->op[strval($field_meta['inputs'][$i]['id'])] = $entry->$field_key;
             }
         } else if (count($field_keys) > count($field_meta['inputs'])) {
             $wuf_last = array_pop($field_keys);
             $gfield_last = array_pop($field_meta['inputs']);
-            $op[strval($gfield_last['id'])] = $entry->$wuf_last;
+            $this->op[strval($gfield_last['id'])] = $entry->$wuf_last;
             $wuf_value = '';
             foreach ($fields->Fields[$w_id]->SubFields as $key => $value) {
                 $wuf_value .= $entry->$key;
                 $wuf_value .= ' ';
             }
-            $op[$field_meta['inputs']][0] = $wuf_value;
+            $this->op[$field_meta['inputs']][0] = $wuf_value;
         }
-
-        return $op;
     }
 
     /**
@@ -794,7 +819,7 @@ class rtWufoo {
      * @param type $wufoo_user
      * @return type
      */
-    function get_user_for_entry($wufoo_user) {
+    function get_user_for_entry($wufoo_user, $wform) {
         $user_id = 1;
         $user_map = maybe_unserialize(get_site_option('rt_wufoo_' . $wform . '_user_map'));
         if (isset($user_map) && !empty($user_map)) {
@@ -820,11 +845,13 @@ class rtWufoo {
      * @param type $page
      * @return type
      */
-    function insert_lead($entry, $lead_table, $ip, $currency, $page) {
-        $user_id = $this->get_user_for_entry($entry->CreatedBy);
+    function insert_lead($entry, $lead_table, $ip, $currency, $page, $wform, $gform) {
+        global $wpdb;
+        $user_id = $this->get_user_for_entry($entry->CreatedBy, $wform);
 
         $date = isset($entry->DateCreated) && $entry->DateCreated != '' ? $entry->DateCreated : date('Y-m-d H:i:s');
-        $user_id = $current_user && $current_user->ID ? $current_user->ID : 'NULL';
+        $current_user_id = get_current_user_id();
+        $user_id = $current_user_id ? $current_user_id : 'NULL';
 
         $user_agent = strlen($_SERVER["HTTP_USER_AGENT"]) > 250 ? substr($_SERVER["HTTP_USER_AGENT"], 0, 250) : $_SERVER["HTTP_USER_AGENT"];
 
@@ -841,9 +868,10 @@ class rtWufoo {
      * @param type $value
      */
     function insert_fields($lead_id, $gform, $inputid, $value) {
+        global $wpdb;
+        $prefix = $wpdb->prefix;
         $wpdb->insert($prefix . 'rg_lead_detail', array('lead_id' => $lead_id, 'form_id' => $gform, 'field_number' => $inputid, 'value' => $value), array('%d', '%d', '%f', '%s'));
         $lead_detail_id = $wpdb->insert_id;
-//If the value is more than 200 chars, insert it into lead detail long table
         if (strlen($value) > 200) {
             $this->insert_lead_detail_long($lead_detail_id, $value);
         }
@@ -869,7 +897,8 @@ class rtWufoo {
      * @param type $table_name
      * @param type $lead_id
      */
-    function move_comments_for_entry($comment, $table_name, $lead_id) {
+    function move_comments_for_entry($comment, $table_name, $lead_id, $wform) {
+        global $wpdb;
         $user_map = maybe_unserialize(get_site_option('rt_wufoo_' . $wform . '_user_map'));
         if (array_key_exists($comment->commentedby, $user_map)) {
             $user = get_user_by('id', $user_map[$comment->commentedby]);

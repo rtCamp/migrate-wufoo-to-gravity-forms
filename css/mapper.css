@@ -2,13 +2,14 @@
 .rt_wufoo_loader{ 
     
     background: transparent url("../images/loading.gif") center center no-repeat;
-    background-color: rgba(255,255,255,0.5);
+    background-color: rgba(255,255,255,0.8);
     position:absolute;
     top:0;
     left:0;
     height: 100%;
     width: 100%;
 }
+
 .rt_wufoo_steps{
     position:relative;
     max-width:600px;
