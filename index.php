@@ -3,7 +3,7 @@
 /*
   Plugin Name: Wufoo to Gravity Importer
   Plugin URI: http://rtcamp.com/
-  Description: Wuffo Form to Garvity Forms migrator!
+  Description: Wufoo Form to Gravity Forms migrator!
   Version: 1.0
   Author: rtCamp
   Author URI: http://rtcamp.com
