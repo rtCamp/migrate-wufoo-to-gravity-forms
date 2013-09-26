@@ -491,6 +491,8 @@ class rtWufoo {
             }
             $return .= '<tr><td colspan="2"><input type="submit" name="map_wuf_get_fields" id="map_wuf_get_fields" value="Next: Sync Form fields" class="button"/></td></tr>';
             $return .= '</table>';
+        } else {
+            $return .= '<input type="submit" name="map_wuf_get_fields" id="map_wuf_get_fields" value="Next: Sync Form fields" class="button"/>';
         }
         $return .= '</form>';
 
