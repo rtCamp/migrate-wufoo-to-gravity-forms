@@ -596,7 +596,7 @@ class rtWufoo {
         }
 
 
-        $saved_entry_index = get_site_option('rt_wufoo_' . $wform . '_entry_complete_count');
+        $saved_entry_index = $this->imported_entries();
         $entry_index = $saved_entry_index ? $saved_entry_index : 0;
         $progress = (int) $entry_index / (int) $entry_count * 100;
         $instance = array(
@@ -628,7 +628,6 @@ class rtWufoo {
         $wform = $_REQUEST['form'];
         $gform = $_REQUEST['gform'];
         $entry_index = $_REQUEST['entry_index'];
-        $entry_count = $_REQUEST['entry_count'];
 
         $this->init();
 
@@ -649,26 +648,30 @@ class rtWufoo {
         $this->op = array();
 
         foreach ($entries as $index => $entry) {
+            $lead_exists_id = $this->is_imported($entry->EntryId);
+            print_r($lead_exists_id);
+            if (!$lead_exists_id) {
 
-            foreach ($field_map as $g_id => $w_id) {
-                if (isset($w_id) && $w_id != '') {
-                    $this->op[$g_id] = '';
-                    $field_meta = RGFormsModel::get_field($gform_meta, $g_id);
-                    if ($field_meta['type'] == 'fileupload') {
-                        $this->op[$g_id] = $this->import_file_upload($entry, $w_id);
-                    } else {
-                        $this->import_regular_field($wform, $entry, $g_id, $w_id, $field_meta);
+                foreach ($field_map as $g_id => $w_id) {
+                    if (isset($w_id) && $w_id != '') {
+                        $this->op[$g_id] = '';
+                        $field_meta = RGFormsModel::get_field($gform_meta, $g_id);
+                        if ($field_meta['type'] == 'fileupload') {
+                            $this->op[$g_id] = $this->import_file_upload($entry, $w_id);
+                        } else {
+                            $this->import_regular_field($wform, $entry, $g_id, $w_id, $field_meta);
+                        }
                     }
                 }
+
+                $currency = $c->get_currency();
+                $ip = $f->get_ip();
+                $page = $f->get_current_page_url();
+                $lead_table = $f->get_lead_table_name();
+
+
+                $lead_id = $this->insert_lead($entry, $lead_table, $ip, $currency, $page, $wform, $gform);
             }
-
-            $currency = $c->get_currency();
-            $ip = $f->get_ip();
-            $page = $f->get_current_page_url();
-            $lead_table = $f->get_lead_table_name();
-
-
-            $lead_id = $this->insert_lead($entry, $lead_table, $ip, $currency, $page, $wform, $gform);
 
             if ($lead_id) {
                 foreach ($this->op as $inputid => $value) {
@@ -682,7 +685,11 @@ class rtWufoo {
                         $this->move_comments_for_entry($comment, $f->get_lead_notes_table_name(), $lead_id, $wform);
                     }
                 }
+            } else {
+                $lead_id = $lead_exists_id;
             }
+
+            gform_update_meta($lead_id, 'rt_wufoo_entry_id', $entry->EntryId);
         }
         //update_site_option('rt_wufoo_' . $wform . '_entry_complete_count','0');
         echo count($entries) + $entry_index;
@@ -889,6 +896,28 @@ class rtWufoo {
         $lead_detail_long = $f->get_lead_details_long_table_name();
         $query = $wpdb->prepare("INSERT INTO $lead_detail_long(lead_detail_id, value) VALUES(%d, %s)", $lead_detail_id, $value);
         $wpdb->query($query);
+    }
+
+    function imported_entries() {
+        global $wpdb;
+        $prefix = $wpdb->prefix;
+        $leads = $prefix . "rg_lead";
+        $meta = $prefix . "rg_lead_meta";
+        $count = $wpdb->get_var("SELECT COUNT(l.id) FROM $leads l
+LEFT JOIN $meta m ON l.id = m.lead_id WHERE meta_key='rt_wufoo_entry_id'");
+        return $count;
+    }
+
+    function is_imported($entry_id) {
+        $is_it = false;
+        global $wpdb;
+        $prefix = $wpdb->prefix;
+        $meta = $prefix . "rg_lead_meta";
+        $query = $wpdb->get_results("SELECT * FROM {$meta} WHERE meta_key='rt_wufoo_entry_id' AND meta_value='{$entry_id}'");
+        if (is_array($query) && count($query) > 0) {
+            $is_it = $query[0]->lead_id;
+        }
+        return $is_it;
     }
 
     /**
