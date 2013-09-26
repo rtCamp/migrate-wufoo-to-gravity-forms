@@ -99,8 +99,12 @@ class rtWufoo {
 
         $this->init();
 
+        try {
+            $total_comment_cont_obj = $this->wufoo->getCommentCount($wuf_form);
+        } catch (Exception $rt_importer_e) {
+            $this->error($rt_importer_e);
+        }
 
-        $total_comment_cont_obj = $this->wufoo->getCommentCount($wuf_form);
 
         return $total_comment_cont_obj->Count;
     }
@@ -278,7 +282,11 @@ class rtWufoo {
     function setup_forms() {
         if (!$this->subdomain || !$this->api_key)
             return;
-        $this->wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
+        try {
+            $this->wufoo = new rtWufooAPI($this->api_key, $this->subdomain);
+        } catch (Exception $rt_importer_e) {
+            $this->error($rt_importer_e);
+        }
     }
 
     /**
@@ -301,7 +309,7 @@ class rtWufoo {
                                    name="map_wuf_sub"
                                    id="map_wuf_sub"
                                    value="<?php echo $this->subdomain; ?>"
-                                   />
+                                   />.wufoo.com
                         </td>
                     </tr>
                     <tr>
@@ -599,6 +607,7 @@ class rtWufoo {
         $saved_entry_index = $this->imported_entries();
         $entry_index = $saved_entry_index ? $saved_entry_index : 0;
         $progress = (int) $entry_index / (int) $entry_count * 100;
+
         $instance = array(
             'name' => 'entry-import',
             'progress' => $progress
@@ -613,7 +622,10 @@ class rtWufoo {
         $return .= '<input type="hidden" name="gform" id="map_wuf_gform" value="' . $gform . '"/>';
         $return .= '<input type="hidden" name="entry_index" id="rt_wufoo_entry_index" value="' . $entry_index . '"/>';
         $return .= '<input type="hidden" name="entry_count" id="rt_wufoo_entry_total" value="' . $entry_count . '"/>';
-        $return .= '<input type="submit" name="rt_wufoo_start_import" id="rt_wufoo_start_import" value="Start Import" class="button" />';
+        if ($progress != 100) {
+            $return .= '<input type="submit" name="rt_wufoo_start_import" id="rt_wufoo_start_import" value="Start Import" class="button" />';
+        }
+
         $return .= '</form>';
         $return .= '</div>';
         echo $return;
@@ -989,9 +1001,7 @@ LEFT JOIN $meta m ON l.id = m.lead_id WHERE meta_key='rt_wufoo_entry_id'");
      * @param type $err
      */
     function error($err) {
-        echo '<pre>';
-        print_r($err);
-        echo '</pre>';
+        print_r($err->message);
     }
 
     /**
