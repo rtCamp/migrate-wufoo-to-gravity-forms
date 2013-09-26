@@ -1005,7 +1005,7 @@ LEFT JOIN $meta m ON l.id = m.lead_id WHERE meta_key='rt_wufoo_entry_id'");
      * @param type $err
      */
     function error($err) {
-        print_r($err->message);
+        print_r($err->getMessage());
     }
 
     /**
