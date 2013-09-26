@@ -456,24 +456,26 @@ class rtWufoo {
         echo $this->import_to();
 
         global $blog_id;
-        $grav_users = get_users(
-                array('blog_id' => $blog_id)
-        );
-        $wuf_form = $_POST['form'];
-        $wuf_commentators = array();
-        global $wpdb;
-        $table_name = $wpdb->prefix . "_rt_w2g_comments";
-        $wuf_commentators = $wpdb->get_results(
-                "
+        if ($this->comment_count() > 0) {
+            $grav_users = get_users(
+                    array('blog_id' => $blog_id)
+            );
+            $wuf_form = $_POST['form'];
+            $wuf_commentators = array();
+            global $wpdb;
+            $table_name = $wpdb->prefix . "_rt_w2g_comments";
+            $wuf_commentators = $wpdb->get_results(
+                    "
             SELECT DISTINCT commentedby
             FROM {$table_name}
             WHERE form= '{$wuf_form}'
             "
-        );
+            );
 
 //Return the markup
-        foreach ($grav_users as $user) {
-            $user_options .= '<option value="' . $user->ID . '">' . $user->user_login . '</option>';
+            foreach ($grav_users as $user) {
+                $user_options .= '<option value="' . $user->ID . '">' . $user->user_login . '</option>';
+            }
         }
 
 
