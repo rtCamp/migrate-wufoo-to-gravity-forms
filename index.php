@@ -1,7 +1,7 @@
 <?php
 
 /*
-  Plugin Name: Wufoo to Gravity Importer
+  Plugin Name: Migrate Wufoo to Gravity Forms
   Plugin URI: http://rtcamp.com/
   Description: Import Wufoo data to Gravity Forms
   Version: 1.0
