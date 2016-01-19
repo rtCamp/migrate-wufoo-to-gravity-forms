@@ -265,5 +265,3 @@ class WufooApiWrapper extends WufooApiWrapperBase {
 		return new WebHookResponse($result->WebHookDeleteResult->Hash);
 	}
 }
-
-?>

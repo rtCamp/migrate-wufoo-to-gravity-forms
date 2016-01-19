@@ -187,5 +187,3 @@ class WufooException extends Exception {
 	}
 	
 };
-
-?>

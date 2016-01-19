@@ -1026,4 +1026,3 @@ LEFT JOIN $meta m ON l.id = m.lead_id WHERE meta_key='rt_wufoo_entry_id'");
     }
 
 }
-?>

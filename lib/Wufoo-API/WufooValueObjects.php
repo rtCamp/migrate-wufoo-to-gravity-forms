@@ -240,7 +240,3 @@ class WebHookResponse {
 		$this->Hash = $hash;
 	}
 }
-
-
-
-?>

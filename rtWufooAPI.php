@@ -40,5 +40,3 @@ class rtWufooAPI extends WufooApiWrapper {
     }
 
 }
-
-?>

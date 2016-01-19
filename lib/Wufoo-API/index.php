@@ -15,5 +15,3 @@ print_a($examples->$_GET['method']($_GET['id']));
 function print_a($subject){
 	echo str_replace("=>","&#8658;",str_replace("Array","<font color=\"red\"><b>Array</b></font>",nl2br(str_replace(" "," &nbsp; ",print_r($subject,true)))) . '<br />');
 }
-
-?>

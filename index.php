@@ -15,9 +15,3 @@ require_once('rtWufooAPI.php');
 require_once('rtProgress.php');
 require_once('rtWufoo.php');
 new rtWufoo();
-
-
-// require_once('lib/parsecsv.lib.php');
-// require_once('rtCSV.php');
-// new rtCSV();
-?>
